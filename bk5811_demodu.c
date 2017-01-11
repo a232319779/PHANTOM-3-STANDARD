@@ -123,7 +123,7 @@ int find_inter()
         float sum_temp = 0.0;
         for(int j = 0; j < sample_count * 2; j += 2)
         {
-            sum_temp += abs(g_buffer[i + j]);
+            sum_temp += abs((int8_t)g_buffer[i + j]);
         }
         float mean_temp = sum_temp / sample_count;
         
