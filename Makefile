@@ -1,7 +1,10 @@
-compile:
-	gcc -std=c99 -g -o decode_bk5811 bk5811_demodu.c
-	gcc -std=c99 -g -o  test test.c -I /usr/include/libhackrf -L /usr/lib/arm-linux-gnueabihf
+bk5811_demodu: main.o bk5811_demodu.o
+	cc -o bk5811_demodu main.o bk5811_demodu.o
+bk5811_demodu.o: bk5811_demodu.c 
+	cc -c -std=c99 bk5811_demodu.c
+main.o: main.c bk5811_demodu.h
+	cc -c -std=c99 main.c
 
 .PHONY : clean
-clean:
-	rm decode_bk5811 test
+clean :
+	rm -f bk5811_demodu *.o 

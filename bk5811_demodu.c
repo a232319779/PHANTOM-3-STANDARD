@@ -6,24 +6,7 @@
 //  Copyright © 2016年 ddvv. All rights reserved.
 //
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <errno.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-#define DLT                 10.0
-
-#define BK_SUCCESS          1
-#define BK_FAILED           0
-#define BK_OVERFLOW         4294967295
-#define BK_PREAMBLE_BITS    (1*8)
-#define BK_ADDRESS_BITS     (5*8)
-#define BK_PCF_BITS         9
-#define BK_PAYLOAD_BITS     (32*8)
-#define BK_CRC_BITS         (2*8)
-
+#include "bk5811_demodu.h"
 
 // save the signal
 // odd：real
@@ -36,11 +19,6 @@ long g_file_length = 0;
 // threshold
 float g_threshold = 0.0;
 
-#define SIGNAL_MAX_BYTES    (1+5+2+32+2)
-#define SIGNAL_MAX_BITS     SIGNAL_MAX_BYTES * 8
-#define SAMPLE_PER_SYMBOL   4
-
-#define PACKET_COUNT 1000
 // inter_array : less than 1000
 // odd:start
 // eve:end
@@ -93,13 +71,13 @@ void release()
 }
 
 // find the threshold
-int mean()
+int mean(char *buffer, int length)
 {
     unsigned long sum = 0;
     //g_file_length
-    for(int i = 0; i < g_file_length; i += 2)
+    for(int i = 0; i < length; i += 2)
     {
-        sum += abs((int8_t)g_buffer[i]);
+        sum += abs((int8_t)buffer[i]);
         if(BK_OVERFLOW < sum)
         {
             printf("error : the sum is overflow!\n");
@@ -112,18 +90,18 @@ int mean()
 
 
 // find the signal
-int find_inter()
+int find_inter(char *buffer, int length)
 {
     long index = 0;
     int is_find = 0;
     int sample_count = 8;
     
-    for(int i = 0; i < g_file_length; i+=2)
+    for(int i = 0; i < length; i+=2)
     {
         float sum_temp = 0.0;
         for(int j = 0; j < sample_count * 2; j += 2)
         {
-            sum_temp += abs((int8_t)g_buffer[i + j]);
+            sum_temp += abs((int8_t)buffer[i + j]);
         }
         float mean_temp = sum_temp / sample_count;
         
@@ -317,22 +295,4 @@ void work()
         signal_new_start = -1;
         i += 2;
     }
-}
-
-
-
-int main(int argc, const char * argv[]) {
-    // read signal
-    //char *sig_file = "4M_5743_recive_0.5s.iq";
-    char *sig_file = "4M_5743_recive_0.5_11_29.iq";
-    if(argc == 2)
-        sig_file = (char *)argv[1];
-    get_signal_data(sig_file);
-    mean();
-    find_inter();
-    work();
-    
-    // release the mem
-    release();
-    return 0;
 }
