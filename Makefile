@@ -26,6 +26,7 @@ bk5811_demodu: $(objects)
 	$(CC) -o bk5811_demodu $(objects) 
 
 # build test
+$(test_objects) : test.h
 $(test_objects) : %.o : %.c
 	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@ 
 # test
