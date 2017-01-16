@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <sys/types.h>
 
 #ifndef bool
 typedef int bool;
