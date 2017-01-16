@@ -1,19 +1,11 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
 
 #include <hackrf.h>
 
 #include "test.h"
-
-#ifndef strtoull 
-#define strtoull _strtoui64
-#endif
-
-#ifndef snprintf
-#define snprintf _snprintf
-#endif
 
 t_u64toa ascii_u64_data1;
 t_u64toa ascii_u64_data2;
