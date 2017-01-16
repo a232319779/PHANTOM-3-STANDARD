@@ -10,11 +10,24 @@ typedef int bool;
 #define FREQ_MIN_HZ (0ull)  /* 0 Hz */
 #define FREQ_MAX_HZ (7250000000ull) /* 7250MHz */
 #define DEFAULT_SAMPLE_RATE_HZ (10000000)   /* 10MHz default sample rate */ 
+#define DEFAULT_FREQ_HZ (900000000ull) /* 900MHz */
+#define DEFAULT_SAMPLE_RATE_HZ (10000000) /* 10MHz default sample rate */
+#define DEFAULT_BASEBAND_FILTER_BANDWIDTH (5000000) /* 5MHz default */
+
+#define BASEBAND_FILTER_BW_MIN (1750000) /* 1.75 MHz min value */
+#define BASEBAND_FILTER_BW_MAX (28000000) /* 28 MHz max value */
 
 #define U64TOA_MAX_DIGIT (31)
 typedef struct _t_u64toa{
     char data[U64TOA_MAX_DIGIT+1];
 } t_u64toa;
+
+typedef enum {
+    TRANSCEIVER_MODE_OFF = 0,
+    TRANSCEIVER_MODE_RX = 1,
+    TRANSCEIVER_MODE_TX = 2,
+    TRANSCEIVER_MODE_SS = 3,
+} transceiver_mode_t;
 
 typedef struct _rf_param{
     uint64_t freq_hz; 
@@ -25,5 +38,11 @@ typedef struct _rf_param{
     bool sample_rate;
     bool receive;
     char *path;
-    bool limit_num_sample;
+    uint64_t samples_to_xfer;
+    ssize_t bytes_to_xfer;
+    bool limit_num_samples;
+    uint32_t lna_gain;
+    uint32_t vga_gain;
+    bool baseband_filter_bw;
+    uint32_t baseband_filter_bw_hz;
 }rf_param, *prf_param;
