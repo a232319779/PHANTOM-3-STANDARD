@@ -3,6 +3,8 @@
 #include <string.h>
 #include <getopt.h>
 #include <sys/time.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include <hackrf.h>
 
