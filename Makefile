@@ -12,8 +12,8 @@ HACKRF_LIB := -L/usr/local/lib -lhackrf
 endif
 
 ifeq ($(shell uname), Darwin)
-HACKRF_INCLUDE := -I/opt/local/include/libhackrf
-HACKRF_LIB := -L/opt/local/lib -lhackrf
+HACKRF_INCLUDE := -I/usr/local/include/libhackrf
+HACKRF_LIB := -L/usr/local/lib -lhackrf
 endif
 
 # build bk5811_demodu
