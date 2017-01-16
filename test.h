@@ -7,6 +7,8 @@ typedef int bool;
 #define false 0
 #endif
 
+#define FD_BUFFER_SIZE (8*1024)
+
 #define FREQ_ONE_MHZ (1000000ull)
 #define FREQ_MIN_HZ (0ull)  /* 0 Hz */
 #define FREQ_MAX_HZ (7250000000ull) /* 7250MHz */
