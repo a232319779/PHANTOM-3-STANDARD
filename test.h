@@ -1,11 +1,6 @@
 #include <stdint.h>
 #include <sys/types.h>
-
-#ifndef bool
-typedef int bool;
-#define true 1
-#define false 0
-#endif
+#include "common.h"
 
 #define FD_BUFFER_SIZE (8*1024)
 

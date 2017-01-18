@@ -6,14 +6,12 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <hackrf.h>
-
 #include "test.h"
 
 t_u64toa ascii_u64_data1;
 t_u64toa ascii_u64_data2;
 
-void usage();
+static void usage();
 char* u64toa(uint64_t val, t_u64toa* str);
 int parse_u32(char* s, uint32_t* const value); 
 int parse_u64(char* s, uint64_t* const value);
@@ -42,20 +40,6 @@ int parse_opt(int argc, char* argv[], rf_param *rp);
         .vga_gain = 20,                             \
         .baseband_filter_bw = false,                \
         .baseband_filter_bw_hz = 0                  \
-}
-
-#define CHECK_RESULT(result, error_name)    if(result != HACKRF_SUCCESS) {  \
-    fprintf(stderr, "%s failed: %s (%d).\n",                                \
-    error_name, hackrf_error_name(result), result);                         \
-    usage();                                                                \
-    return EXIT_FAILURE;                                                    \
-    }    
-
-#define CHECK_IF_ELSE(result, error_name)   if(result != HACKRF_SUCCESS) {  \
-    fprintf(stderr, "%s failed: %s (%d)\n",                                 \
-    error_name, hackrf_error_name(result), result);                         \
-    }else {                                                                 \
-    fprintf(stderr, "%s done.\n", error_name);                              \
 }
 
 static transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
@@ -230,7 +214,7 @@ int main(int argc, char *argv[])
     return exit_code;
 }
 
-void usage()
+static void usage()
 {
     printf("Usage:\n");
     printf("\t[-f freq_hz] # Frequency in Hz [%sMHz to %sMHz].\n",
