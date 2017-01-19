@@ -18,11 +18,14 @@ long g_file_length = 0;
 
 // threshold
 float g_threshold = 0.0;
+#define DEFAULT_THRESHOLD   (10.0)
 
 // inter_array : less than 1000
 // odd:start
 // eve:end
 long g_inter[PACKET_COUNT] = {0};
+
+int g_pkg_count = 0;
 
 // read signal from file
 // g_buffer : malloc in this function, and should be freed by release() function
@@ -71,11 +74,13 @@ void release()
 }
 
 // find the threshold
-int mean(char *buffer, int length)
+int mean(char *buffer, long start, long length)
 {
     unsigned long sum = 0;
-    //g_file_length
-    for(int i = 0; i < length; i += 2)
+    //g_file_lengt
+    long end = (start + length) < g_file_length ? (start + length) : g_file_length;
+    
+    for(long i = start; i < end; i += 2)
     {
         sum += abs((int8_t)buffer[i]);
         if(BK_OVERFLOW < sum)
@@ -84,22 +89,25 @@ int mean(char *buffer, int length)
             return BK_FAILED;
         }
     }
-    g_threshold = sum * 2.0 * DLT / g_file_length;
+    float temp = (sum * 2.0 * DLT / length);
+    g_threshold = temp > DEFAULT_THRESHOLD ? temp : DEFAULT_THRESHOLD;
+
     return BK_SUCCESS;
 }
 
 
 // find the signal
-int find_inter(char *buffer, int length)
+int find_inter(char *buffer, long start, long length)
 {
     long index = 0;
     int is_find = 0;
     int sample_count = 8;
     
-    for(int i = 0; i < length; i+=2)
+    long end = (start + length) < g_file_length ? (start + length) : g_file_length;
+    for(long i = start; i < end; i+=2)
     {
         float sum_temp = 0.0;
-        for(int j = 0; j < sample_count * 2; j += 2)
+        for(long j = 0; j < sample_count * 2; j += 2)
         {
             sum_temp += abs((int8_t)buffer[i + j]);
         }
@@ -214,7 +222,6 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 void work()
 {
     int i = 0;
-    uint32_t signal_count = 0;
     
     while(0 != g_inter[i])
     {
@@ -247,7 +254,7 @@ void work()
                     address |= (demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL) & 0xff);
                 }
                 
-                signal_count++;
+                g_pkg_count++;
                 // decode pcf
                 signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
                 pcf |= (uint8_t)demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL);
@@ -283,7 +290,7 @@ void work()
                     if(crc == new_crc)
                     {
                         // print the values
-                        printf("pk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", signal_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
+                        printf("pk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
                         printf("payload : ");
                         for(int j = 0; j < payload_len; j++)
                             printf("%02X", packet_buffer[j]);

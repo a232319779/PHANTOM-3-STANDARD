@@ -35,8 +35,12 @@
 
 #define PACKET_COUNT 1000
 
+#define PER_PACKET_SIZE (4000000 * 7 * 2 / 1000)
+#define PACKET_SIZE (2 * PER_PACKET_SIZE)
+
 extern char* g_buffer;
 extern long g_file_length;
+extern long g_inter[PACKET_COUNT];
 
 // read signal from file
 // g_buffer : malloc in this function, and should be freed by release() function
@@ -46,10 +50,10 @@ int get_signal_data(char *filename);
 void release();
 
 // calculate the threshold
-int mean(char *buffer, int length);
+int mean(char *buffer, long start, long length);
 
 // find the signal
-int find_inter(char *buffer, int length);
+int find_inter(char *buffer, long start, long length);
 
 // work function
 void work();

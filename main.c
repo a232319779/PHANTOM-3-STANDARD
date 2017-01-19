@@ -1,3 +1,4 @@
+#include <memory.h>
 #include "bk5811_demodu.h"
 
 int main(int argc, char *argv[])
@@ -7,10 +8,14 @@ int main(int argc, char *argv[])
       sig_file = argv[1];
 
     get_signal_data(sig_file);
-    mean(g_buffer, g_file_length);
-    find_inter(g_buffer, g_file_length);
-    work();
-
+    for(long i = 0; i < g_file_length; i += PACKET_SIZE)
+    {
+        memset(g_inter, 0, sizeof(g_inter));
+        mean(g_buffer, i, PACKET_SIZE);
+        find_inter(g_buffer, i, PACKET_SIZE);
+        work();
+    }
+    printf("end.\n");
     //release the memory.
     release();
 
