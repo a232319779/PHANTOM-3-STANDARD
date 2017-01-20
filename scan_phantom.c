@@ -9,10 +9,6 @@
 #include "common.h"
 #include "bk5811_demodu.h"
 
-t_u64toa ascii_u64_data1;
-t_u64toa ascii_u64_data2;
-
-static void usage();
 void sigint_callback_handler(int signum);
 int rx_callback(hackrf_transfer *transfer);
 
@@ -38,7 +34,6 @@ int scan(uint64_t freq_hz);
         .baseband_filter_bw_hz = 1000000                  \
 }
 
-static transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
 static hackrf_device* device = NULL;
 volatile uint32_t byte_count = 0;
 static bool do_exit = false;
@@ -80,32 +75,17 @@ int scan(uint64_t freq_hz)
         rp.baseband_filter_bw_hz = hackrf_compute_baseband_filter_bw(rp.baseband_filter_bw_hz);
     }
 
-    if( rp.receive){
-        transceiver_mode = TRANSCEIVER_MODE_RX;
-    }
-
     result = hackrf_init();
-    CHECK_RESULT(result, "hackrf_init()");
-
     result = hackrf_open_by_serial(serial_number, &device);
-    CHECK_RESULT(result, "hackrf_open()");
 
     result = hackrf_set_sample_rate_manual(device, rp.sample_rate_hz, 1);
-    CHECK_RESULT(result, "hackrf_sample_rate_set()");
-
     result = hackrf_set_baseband_filter_bandwidth(device, rp.baseband_filter_bw_hz);
-    CHECK_RESULT(result, "hackrf_baseband_filter_bandwidth_set()");
-
     result = hackrf_set_vga_gain(device, rp.vga_gain);
     result |= hackrf_set_lna_gain(device, rp.lna_gain);
     result |= hackrf_start_rx(device, rx_callback, NULL);
-    CHECK_RESULT(result, "hackrf_start_?x()");
 
     result = hackrf_set_freq(device, freq_hz);
-    CHECK_RESULT(result, "hackrf_set_freq()");
-
     result = hackrf_set_amp_enable(device, (uint8_t)rp.amp_enable);
-    CHECK_RESULT(result, "hackrf_set_amp_enable()");
 
     buffer = (char *)malloc(262144);
     memset(buffer, 0, 262144);
@@ -129,24 +109,11 @@ int scan(uint64_t freq_hz)
     }
     free(buffer);
 
-    if( device != NULL)
-    {
-        if (rp.receive)
-        {
-            result = hackrf_stop_rx(device); 
-        }
-
-        result = hackrf_close(device);
-
-        hackrf_exit();
-    }
+    result = hackrf_stop_rx(device); 
+    result = hackrf_close(device);
+    hackrf_exit();
 
     return 0;
-}
-
-static void usage()
-{
-    printf("Usage:\n");
 }
 
 void sigint_callback_handler(int signum)
@@ -157,11 +124,8 @@ void sigint_callback_handler(int signum)
 
 int rx_callback(hackrf_transfer *transfer)
 {
-	ssize_t bytes_to_write;
-
     pthread_mutex_lock(&mutex);
     byte_count += transfer->valid_length;
-    bytes_to_write = transfer->valid_length;
     memcpy(buffer, transfer->buffer, transfer->buffer_length);
     pthread_mutex_unlock(&mutex);
     do_count++;

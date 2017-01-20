@@ -1,49 +1,46 @@
-# two elf : bk5811_demod, test
-all: bk5811_demodu test real_time_decode
+all_elfs = decode capture scan_phantom
+all_objects = bk5811_demodu.o decode.o capture.o scan_phantom.o
+all: $(all_elfs)
 .PHONY : all
 
 CFLAGS += -g -Wall -std=c99
-objects = main.o bk5811_demodu.o
-test_objects = test.o
-real_time_objects = real_time_decode.o
+bk5811_demodu_objects = bk5811_demodu.o
+decode_objects = decode.o
+capture_objects = capture.o
+scan_phantom_objects = scan_phantom.o
 
+# should be modify when it's change
 ifeq ($(shell uname), Linux)
 HACKRF_INCLUDE := -I/usr/local/include/libhackrf
 HACKRF_LIB := -L/usr/local/lib -lhackrf 
-endif
-
-ifeq ($(shell uname), Darwin)
+else ifeq ($(shell uname), Darwin)
 HACKRF_INCLUDE := -I/usr/local/include/libhackrf
 HACKRF_LIB := -L/usr/local/lib -lhackrf
 endif
 
-# build bk5811_demodu
 # if the .h has been modified, should be recompile.
-$(objects):bk5811_demodu.h
-$(objects) : %.o : %.c
+# compile
+# no need hackrf header
+$(bk5811_demodu_objects) $(decode_objects) : bk5811_demodu.h
+$(bk5811_demodu_objects) $(decode_objects) : %.o : %.c
 	$(CC) -c $(CFLAGS) $< -o $@
-# bk5811_demodu
-bk5811_demodu: $(objects)
-	$(CC) -g -o bk5811_demodu $(objects) 
-
-# build test
-$(test_objects) : common.h 
-$(test_objects) : %.o : %.c
-	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@ 
-# test
-test : $(test_objects) 
-	$(CC) -g -o test $(CFLAGS) $(HACKRF_LIB) $(test_objects)
-
-# build real_time_decode
-$(real_time_objects) : common.h bk5811_demodu.h
-$(real_time_objects) : %.o : %.c
+# need hackrf header
+$(capture_objects) $(scan_phantom_objects) : common.h bk5811_demodu.h
+$(capture_objects) $(scan_phantom_objects) : %.o : %.c
 	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@
-# real_time_decode
-real_time_decode : $(real_time_objects)
-	$(CC) -g -o real_time_decode $(CFLAGS) $(HACKRF_LIB) $(real_time_objects) bk5811_demodu.o
+	
+# link
+# decode no need hackrf libs
+decode : $(bk5811_demodu_objects) $(decode_objects) 
+	$(CC) -g -o decode $(CFLAGS) $(bk5811_demodu_objects) $(decode_objects)
+# capture nedd hackrf libs
+capture : $(capture_objects) 
+	$(CC) -g -o capture $(CFLAGS) $(HACKRF_LIB) $(capture_objects)
+# scan_phantom need hackrf lilbs
+scan_phantom : $(scan_phantom_objects) $(bk5811_demodu_objects) 
+	$(CC) -g -o scan_phantom $(CFLAGS) $(HACKRF_LIB) $(scan_phantom_objects) $(bk5811_demodu_objects) 
 
 .PHONY : clean
 clean :
-	-rm -f bk5811_demodu $(objects) 
-	-rm -f test $(test_objects)
-	-rm -f real_time_decode $(real_time_objects)
+	-rm -f $(all_objects) 
+	-rm -f $(all_elfs) 
