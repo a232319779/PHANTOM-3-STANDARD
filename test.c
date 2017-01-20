@@ -6,7 +6,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "test.h"
+#include "common.h"
 
 t_u64toa ascii_u64_data1;
 t_u64toa ascii_u64_data2;

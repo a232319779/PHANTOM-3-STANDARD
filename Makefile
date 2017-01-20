@@ -27,7 +27,7 @@ bk5811_demodu: $(objects)
 	$(CC) -g -o bk5811_demodu $(objects) 
 
 # build test
-$(test_objects) : test.h common.h 
+$(test_objects) : common.h 
 $(test_objects) : %.o : %.c
 	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@ 
 # test
@@ -35,7 +35,7 @@ test : $(test_objects)
 	$(CC) -g -o test $(CFLAGS) $(HACKRF_LIB) $(test_objects)
 
 # build real_time_decode
-$(real_time_objects) : common.h bk5811_demodu.h test.h
+$(real_time_objects) : common.h bk5811_demodu.h
 $(real_time_objects) : %.o : %.c
 	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@
 # real_time_decode
