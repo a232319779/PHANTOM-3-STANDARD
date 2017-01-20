@@ -346,7 +346,7 @@ int parse_opt(int argc, char *argv[], rf_param *rp)
        {
            case 'h' :
                usage();
-               break;
+               exit(0);
            case 'f' :
                f_hz = strtod(optarg, &endptr);
                if (optarg == endptr) {

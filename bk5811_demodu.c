@@ -212,9 +212,10 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 }
 
 // work function
-void work(char *buffer)
+int work(char *buffer)
 {
     int i = 0;
+    int isfind = 0;
     
     while(0 != g_inter[i])
     {
@@ -247,7 +248,6 @@ void work(char *buffer)
                     address |= (demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL) & 0xff);
                 }
                 
-                g_pkg_count++;
                 // decode pcf
                 signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
                 pcf |= (uint8_t)demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
@@ -282,12 +282,15 @@ void work(char *buffer)
                     //
                     if(crc == new_crc)
                     {
+                        g_pkg_count++;
                         // print the values
                         printf("pk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
                         printf("payload : ");
                         for(int j = 0; j < payload_len; j++)
                             printf("%02X", packet_buffer[j]);
                         printf(",\tcrc : %04X\n", crc);
+                        // find signal
+                        isfind = 1;
                     }
                 }
             }
@@ -295,4 +298,6 @@ void work(char *buffer)
         signal_new_start = -1;
         i += 2;
     }
+
+    return isfind;
 }

@@ -54,7 +54,8 @@ int mean(char *buffer, long start, long length);
 int find_inter(char *buffer, long start, long length);
 
 // work function
-void work(char *buffer);
+// if find signal return 1, others 0.
+int work(char *buffer);
 
 /* pravite functions */
 

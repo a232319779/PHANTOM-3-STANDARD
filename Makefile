@@ -23,22 +23,22 @@ endif
 # no need hackrf header
 $(bk5811_demodu_objects) $(decode_objects) : bk5811_demodu.h
 $(bk5811_demodu_objects) $(decode_objects) : %.o : %.c
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 # need hackrf header
 $(capture_objects) $(scan_phantom_objects) : common.h bk5811_demodu.h
 $(capture_objects) $(scan_phantom_objects) : %.o : %.c
-	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@
+	$(CC) $(CFLAGS) $(HACKRF_INCLUDE) -c $< -o $@
 	
 # link
 # decode no need hackrf libs
 decode : $(bk5811_demodu_objects) $(decode_objects) 
-	$(CC) -g -o decode $(CFLAGS) $(bk5811_demodu_objects) $(decode_objects)
+	$(CC) -o decode $(CFLAGS) $(bk5811_demodu_objects) $(decode_objects)
 # capture nedd hackrf libs
 capture : $(capture_objects) 
-	$(CC) -g -o capture $(CFLAGS) $(HACKRF_LIB) $(capture_objects)
+	$(CC) -o capture $(CFLAGS) $(HACKRF_LIB) $(capture_objects)
 # scan_phantom need hackrf lilbs
 scan_phantom : $(scan_phantom_objects) $(bk5811_demodu_objects) 
-	$(CC) -g -o scan_phantom $(CFLAGS) $(HACKRF_LIB) $(scan_phantom_objects) $(bk5811_demodu_objects) 
+	$(CC) -o scan_phantom $(CFLAGS) $(HACKRF_LIB) $(scan_phantom_objects) $(bk5811_demodu_objects) 
 
 .PHONY : clean
 clean :
