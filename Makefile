@@ -35,12 +35,12 @@ test : $(test_objects)
 	$(CC) -g -o test $(CFLAGS) $(HACKRF_LIB) $(test_objects)
 
 # build real_time_decode
-$(real_time_objects) : common.h
+$(real_time_objects) : common.h bk5811_demodu.h test.h
 $(real_time_objects) : %.o : %.c
 	$(CC) -c $(CFLAGS) $(HACKRF_INCLUDE) $< -o $@
 # real_time_decode
 real_time_decode : $(real_time_objects)
-	$(CC) -g -o real_time_decode $(CFLAGS) $(HACKRF_LIB) $(real_time_objects)
+	$(CC) -g -o real_time_decode $(CFLAGS) $(HACKRF_LIB) $(real_time_objects) bk5811_demodu.o
 
 .PHONY : clean
 clean :

@@ -7,17 +7,21 @@ int main(int argc, char *argv[])
     if (argc == 2)
       sig_file = argv[1];
 
-    get_signal_data(sig_file);
-    for(long i = 0; i < g_file_length; i += PACKET_SIZE)
+    char *buffer = NULL;
+    long file_length = 0;
+    get_signal_data(sig_file, &buffer, &file_length);
+    long end = 0;
+    for(long i = 0; i < file_length; i += PACKET_SIZE)
     {
+        end = PACKET_SIZE < (file_length - i) ? PACKET_SIZE : (file_length - i - 2);
         memset(g_inter, 0, sizeof(g_inter));
-        mean(g_buffer, i, PACKET_SIZE);
-        find_inter(g_buffer, i, PACKET_SIZE);
-        work();
+        mean(buffer, i, end);
+        find_inter(buffer, i, end);
+        work(buffer);
     }
     printf("end.\n");
     //release the memory.
-    release();
+    release(buffer);
 
     return 0;
 }

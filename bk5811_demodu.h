@@ -38,16 +38,14 @@
 #define PER_PACKET_SIZE (4000000 * 7 * 2 / 1000)
 #define PACKET_SIZE (2 * PER_PACKET_SIZE)
 
-extern char* g_buffer;
-extern long g_file_length;
 extern long g_inter[PACKET_COUNT];
 
 // read signal from file
 // g_buffer : malloc in this function, and should be freed by release() function
-int get_signal_data(char *filename);
+int get_signal_data(char *filename, char **buffer, long *file_length);
 
-// free the g_buffer
-void release();
+// free the buffer
+void release(char *buffer);
 
 // calculate the threshold
 int mean(char *buffer, long start, long length);
@@ -56,15 +54,15 @@ int mean(char *buffer, long start, long length);
 int find_inter(char *buffer, long start, long length);
 
 // work function
-void work();
+void work(char *buffer);
 
 /* pravite functions */
 
 // dedmodulate the signal
-int8_t demod_bits(long ss, int demod_length, int sample_per_symbol);
+int8_t demod_bits(char *buffer, long ss, int demod_length, int sample_per_symbol);
 
 // search the preamble
-long search_preamble(long ss, long sig_len, int match_length, int sample_per_symbol);
+long search_preamble(char *buffer, long ss, long sig_len, int match_length, int sample_per_symbol);
 
 // value to bytes array
 void packet_pack(int64_t address, uint16_t pcf, uint8_t *payload, int payload_len, uint8_t *packet);

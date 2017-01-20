@@ -8,13 +8,6 @@
 
 #include "bk5811_demodu.h"
 
-// save the signal
-// odd：real
-// eve: imag
-char *g_buffer = NULL;
-
-// file size
-long g_file_length = 0;
 
 // threshold
 float g_threshold = 0.0;
@@ -28,8 +21,8 @@ long g_inter[PACKET_COUNT] = {0};
 int g_pkg_count = 0;
 
 // read signal from file
-// g_buffer : malloc in this function, and should be freed by release() function
-int get_signal_data(char *filename)
+// buffer : malloc in this function, and should be freed by release() function
+int get_signal_data(char *filename, char **buffer, long *file_length)
 {
     FILE *fp = NULL;
     
@@ -43,19 +36,19 @@ int get_signal_data(char *filename)
     }
     
     fseek(fp,0,SEEK_END);   // 2
-    g_file_length = ftell(fp);
+    *file_length = ftell(fp);
     fseek(fp,0,SEEK_SET);   // 0
     
-    g_buffer = (char *)malloc(g_file_length);
+    *buffer = (char *)malloc(*file_length);
    
-    if(NULL == g_buffer)
+    if(NULL == *buffer)
     {
         printf("malloc mem failed.\n");
         return BK_FAILED;
     }
     
     // file should be less than 2^32
-    fread(g_buffer, sizeof(char), g_file_length, fp);
+    fread(*buffer, sizeof(char), *file_length, fp);
     //printf ("error: %s\n",strerror(errno));
     
     fclose(fp);
@@ -64,12 +57,12 @@ int get_signal_data(char *filename)
 }
 
 // free the buffer
-void release()
+void release(char *buffer)
 {
-    if(NULL != g_buffer)
+    if(NULL != buffer)
     {
-        free(g_buffer);
-        g_buffer = NULL;
+        free(buffer);
+        buffer = NULL;
     }
 }
 
@@ -77,9 +70,9 @@ void release()
 int mean(char *buffer, long start, long length)
 {
     unsigned long sum = 0;
-    //g_file_lengt
-    long end = (start + length) < g_file_length ? (start + length) : g_file_length;
     
+    long end = start + length;
+
     for(long i = start; i < end; i += 2)
     {
         sum += abs((int8_t)buffer[i]);
@@ -103,8 +96,8 @@ int find_inter(char *buffer, long start, long length)
     int is_find = 0;
     int sample_count = 8;
     
-    long end = (start + length) < g_file_length ? (start + length) : g_file_length;
-    for(long i = start; i < end; i+=2)
+    long end = start + length;
+    for(long i = start; i < end - sample_count * 2; i+=2)
     {
         float sum_temp = 0.0;
         for(long j = 0; j < sample_count * 2; j += 2)
@@ -130,17 +123,17 @@ int find_inter(char *buffer, long start, long length)
 }
 
 // demodulate the signal
-int8_t demod_bits(long ss, int demod_length, int sample_per_symbol)
+int8_t demod_bits(char *buffer, long ss, int demod_length, int sample_per_symbol)
 {
     int8_t result = 0;
     int8_t I0, Q0, I1, Q1;
     
     for(int i = 0;i < (demod_length * sample_per_symbol * 2 - 1); i += (sample_per_symbol*2))
     {
-        I0 = g_buffer[ss + i];
-        Q0 = g_buffer[ss + i + 1];
-        I1 = g_buffer[ss + i + 2];
-        Q1 = g_buffer[ss + i + 3];
+        I0 = buffer[ss + i];
+        Q0 = buffer[ss + i + 1];
+        I1 = buffer[ss + i + 2];
+        Q1 = buffer[ss + i + 3];
         
         if((I0*Q1 - I1*Q0) > 0)
             result |= 1 << (demod_length - i/sample_per_symbol/2 - 1);
@@ -153,7 +146,7 @@ int8_t demod_bits(long ss, int demod_length, int sample_per_symbol)
 }
 
 // search the preamble
-long search_preamble(long ss, long sig_len, int match_length, int sample_per_symbol)
+long search_preamble(char *buffer, long ss, long sig_len, int match_length, int sample_per_symbol)
 {
     uint8_t result = 0;
     long sig_new_start = -1;
@@ -161,8 +154,8 @@ long search_preamble(long ss, long sig_len, int match_length, int sample_per_sym
     for(int i = 0; i < (sig_len - SIGNAL_MAX_BITS); i += 2)
     {
         // find 10101010b ＝ 0x0AA or 01010101b = 0x55
-        result = demod_bits(ss + i, match_length, sample_per_symbol);
-        bit = demod_bits(ss + i + match_length * sample_per_symbol * 2, 8, sample_per_symbol);
+        result = demod_bits(buffer, ss + i, match_length, sample_per_symbol);
+        bit = demod_bits(buffer, ss + i + match_length * sample_per_symbol * 2, 8, sample_per_symbol);
         bit >>= 7;
         bit &= 1;
         if((result == 0xAA) && (1 == bit))     // should be change by user
@@ -219,7 +212,7 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 }
 
 // work function
-void work()
+void work(char *buffer)
 {
     int i = 0;
     
@@ -240,27 +233,27 @@ void work()
         if((signal_end - signal_start) > SIGNAL_MAX_BITS)
         {
             //find the preamble code
-            signal_new_start = search_preamble(signal_start, signal_end - signal_start, 8, SAMPLE_PER_SYMBOL);
+            signal_new_start = search_preamble(buffer, signal_start, signal_end - signal_start, 8, SAMPLE_PER_SYMBOL);
             if(-1 != signal_new_start)
             {
                 // decode preamble
                 signal_start += signal_new_start;
-                preamble = demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL);
+                preamble = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                 
                 // decode address
                 for (int j = 0; j < 5; j++) {
                     signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
                     address <<= 8;
-                    address |= (demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL) & 0xff);
+                    address |= (demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL) & 0xff);
                 }
                 
                 g_pkg_count++;
                 // decode pcf
                 signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                pcf |= (uint8_t)demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL);
+                pcf |= (uint8_t)demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                 pcf <<= 1;
                 signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                uint8_t temp = demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL);
+                uint8_t temp = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                 temp >>= 7;
                 pcf |= temp;
                 
@@ -272,16 +265,16 @@ void work()
                     // decode payload
                     signal_start += (1 * SAMPLE_PER_SYMBOL * 2);
                     for (int j = 0; j < payload_len; j++) {
-                        packet_buffer[j] = demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL);
+                        packet_buffer[j] = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                         signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
                     }
                 
                     // decode crc
                     //signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                    crc = demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL);
+                    crc = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                     signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
                     crc <<= 8;
-                    crc |= (demod_bits(signal_start, 8, SAMPLE_PER_SYMBOL)&0xff);
+                    crc |= (demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL)&0xff);
                     
                     packet_pack(address, pcf, packet_buffer, payload_len, packet);
                     new_crc = calc_crc(packet, payload_len + 7);
