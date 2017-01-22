@@ -212,11 +212,13 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 }
 
 // work function
-int work(char *buffer)
+int work(char *buffer, int8_t *ord)
 {
     int i = 0;
     int isfind = 0;
     
+    // test 
+    int count = 0;
     while(0 != g_inter[i])
     {
         long signal_start = g_inter[i];
@@ -230,6 +232,7 @@ int work(char *buffer)
         uint16_t crc = 0;
         uint8_t packet[45] = {0};
         uint16_t new_crc = 0;
+
         // a signal must be more than 400bit
         if((signal_end - signal_start) > SIGNAL_MAX_BITS)
         {
@@ -239,6 +242,8 @@ int work(char *buffer)
             {
                 // decode preamble
                 signal_start += signal_new_start;
+                int temp_position = signal_start;
+
                 preamble = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                 
                 // decode address
@@ -282,6 +287,17 @@ int work(char *buffer)
                     //
                     if(crc == new_crc)
                     {
+                        /*
+                        if(t_time1 != 0)
+                            printf("p : %f\n", (signal_start - t_time1)/8000.0);
+                        t_time1 = signal_start;
+                        */
+                        if(ord != NULL)
+                        {
+                            *ord = (int)(temp_position / 56000.0 + 0.5) % 16;
+                            printf("ord : %d\n", *ord);
+                        }
+                        printf("find %d signal.\n", ++count);
                         g_pkg_count++;
                         // print the values
                         printf("pk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
