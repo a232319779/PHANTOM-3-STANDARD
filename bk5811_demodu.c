@@ -212,7 +212,7 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 }
 
 // work function
-int work(char *buffer, int8_t *ord)
+int work(char *buffer, long *start_position)
 {
     int i = 0;
     int isfind = 0;
@@ -242,7 +242,7 @@ int work(char *buffer, int8_t *ord)
             {
                 // decode preamble
                 signal_start += signal_new_start;
-                int temp_position = signal_start;
+                //*start_position = signal_start;
 
                 preamble = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                 
@@ -292,11 +292,7 @@ int work(char *buffer, int8_t *ord)
                             printf("p : %f\n", (signal_start - t_time1)/8000.0);
                         t_time1 = signal_start;
                         */
-                        if(ord != NULL)
-                        {
-                            *ord = (int)(temp_position / 56000.0 + 0.5) % 16;
-                            printf("ord : %d\n", *ord);
-                        }
+                        *start_position = signal_start;
                         printf("find %d signal.\n", ++count);
                         g_pkg_count++;
                         // print the values

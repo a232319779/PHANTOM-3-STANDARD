@@ -55,7 +55,7 @@ int find_inter(char *buffer, long start, long length);
 
 // work function
 // if find signal return 1, others 0.
-int work(char *buffer, int8_t *ord);
+int work(char *buffer, long *start_position);
 
 /* pravite functions */
 

@@ -44,6 +44,9 @@ int scan(uint64_t freq_hz, int8_t channel);
         .baseband_filter_bw_hz = 1000000                  \
 }
 
+#define IF_ALL  0
+#define IF_ONE  1
+
 static hackrf_device* device = NULL;
 volatile uint32_t byte_count = 0;
 static bool do_exit = false;
@@ -78,11 +81,12 @@ int main(int argc, char *argv[])
         return -1;
     
     uint64_t freq_hz = rp.freq_hz;
-    /*
+   
+#if IF_ALL
     char file_name[255] = {0};
     sprintf(file_name, "all.iq");
     fd = fopen(file_name, "wb");
-    */
+#endif
     for(i = 0; i < CHANNELS_NUMBER; i++)
     {
         fprintf(stderr, "channel number : %d\t channel frequency : %llu\n", i, freq_hz);
@@ -92,12 +96,12 @@ int main(int argc, char *argv[])
             break;
         freq_hz +=  FREQ_ONE_MHZ;
     }
-    /*
+#if IF_ALL
     if(fd != NULL){
         fclose(fd);
         fd = NULL;
     }
-    */
+#endif
     fprintf(stdout, "find signal at these channels:\n");
     int count = 0;
     for(i = 0; i < CHANNELS_NUMBER; i++)
@@ -146,28 +150,41 @@ int scan(uint64_t freq_hz, int8_t channle)
     do_count = 0;
     do_per_channel = 0;
 
+#if IF_ONE    
     char file_name[255] = {0};
     sprintf(file_name, "receive_%lluMHz.iq", freq_hz/FREQ_ONE_MHZ);
     fd = fopen(file_name, "wb");
+#endif
     while( (hackrf_is_streaming(device) == HACKRF_TRUE) && (do_count < TIMES_PER_CHANNEL));
     //{ 
     //sleep(1);
     pthread_mutex_lock(&mutex);
-    int8_t ord = -1;
+    long start_position = -1;
+    long last_position = 0;
+    uint8_t ord = -1;
     mean(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL);
     find_inter(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL); 
-    if( 1 ==  work(buffer, &ord))
+    if( 1 ==  work(buffer, &start_position))
+    {
         isfind = 1;
-    g_ord[ord] = channle;
+        ord = (int)((start_position + last_position)/56000.0+0.5)%16;
+        last_position = start_position;
+        if(g_ord[ord] != 0)
+            printf("----------conflict : prev--%d, current--%d----------\n", g_ord[ord], channle);
+        g_ord[ord] = channle;
+    }
     memset(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL);
     memset(g_inter, 0, PACKET_COUNT);
     pthread_mutex_unlock(&mutex);
     //}
     free(buffer);
+
+#if IF_ONE    
     if(fd != NULL){
         fclose(fd);
         fd = NULL;
     }
+#endif    
 
     result = hackrf_stop_rx(device); 
     result = hackrf_close(device);
@@ -183,14 +200,19 @@ void sigint_callback_handler(int signum)
 
 int rx_callback(hackrf_transfer *transfer)
 {
-    pthread_mutex_lock(&mutex);
-    memcpy(buffer + do_per_channel, transfer->buffer, transfer->buffer_length);
-	fwrite(transfer->buffer, 1, transfer->buffer_length, fd);
-    do_count++;
-    //printf("do_per_channel : %d\n", do_per_channel);
-    do_per_channel += transfer->buffer_length;
-    byte_count += transfer->buffer_length;
-    pthread_mutex_unlock(&mutex);
-
+    byte_count++; 
+    if(do_count < TIMES_PER_CHANNEL)
+    {
+        pthread_mutex_lock(&mutex);
+        memcpy(buffer + do_per_channel, transfer->buffer, transfer->buffer_length);
+#if IF_ALL||IF_ONE
+        fwrite(transfer->buffer, 1, transfer->buffer_length, fd);
+#endif
+        do_count++;
+        //byte_count++; 
+        //printf("do_per_channel : %d\n", do_per_channel);
+        do_per_channel += transfer->buffer_length;
+        pthread_mutex_unlock(&mutex);
+    }
     return 0;
 }
