@@ -1,20 +1,46 @@
-CFLAGS += -std=c99
-objects = main.o bk5811_demodu.o
+all_elfs = decode capture scan_phantom
+all_objects = bk5811_demodu.o decode.o capture.o scan_phantom.o
+all: $(all_elfs)
+.PHONY : all
 
-bk5811_demodu: $(objects)
-	cc -o bk5811_demodu $(objects) 
+CFLAGS += -g -Wall -std=c99
+bk5811_demodu_objects = bk5811_demodu.o
+decode_objects = decode.o
+capture_objects = capture.o
+scan_phantom_objects = scan_phantom.o
 
-all: $(objects)
+# should be modify when it's change
+ifeq ($(shell uname), Linux)
+HACKRF_INCLUDE := -I/usr/local/include/libhackrf
+HACKRF_LIB := -L/usr/local/lib -lhackrf 
+else ifeq ($(shell uname), Darwin)
+HACKRF_INCLUDE := -I/usr/local/include/libhackrf
+HACKRF_LIB := -L/usr/local/lib -lhackrf
+endif
+
 # if the .h has been modified, should be recompile.
-$(objects):bk5811_demodu.h
-$(objects):%.o:%.c
-	$(CC) -c $(CFLAGS) $< -o $@
-
-# if the .h has been modified, should be recompile.
-#bk5811_demodu.o: bk5811_demodu.h 
-#main.o: bk5811_demodu.h 
-#cc -c -std=c99 main.c
+# compile
+# no need hackrf header
+$(bk5811_demodu_objects) $(decode_objects) : bk5811_demodu.h
+$(bk5811_demodu_objects) $(decode_objects) : %.o : %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+# need hackrf header
+$(capture_objects) $(scan_phantom_objects) : common.h bk5811_demodu.h
+$(capture_objects) $(scan_phantom_objects) : %.o : %.c
+	$(CC) $(CFLAGS) $(HACKRF_INCLUDE) -c $< -o $@
+	
+# link
+# decode no need hackrf libs
+decode : $(bk5811_demodu_objects) $(decode_objects) 
+	$(CC) -o decode $(CFLAGS) $(bk5811_demodu_objects) $(decode_objects)
+# capture nedd hackrf libs
+capture : $(capture_objects) 
+	$(CC) -o capture $(CFLAGS) $(HACKRF_LIB) $(capture_objects)
+# scan_phantom need hackrf lilbs
+scan_phantom : $(scan_phantom_objects) $(bk5811_demodu_objects) 
+	$(CC) -o scan_phantom $(CFLAGS) $(HACKRF_LIB) $(scan_phantom_objects) $(bk5811_demodu_objects) 
 
 .PHONY : clean
 clean :
-	rm -f bk5811_demodu $(objects) 
+	-rm -f $(all_objects) 
+	-rm -f $(all_elfs) 
