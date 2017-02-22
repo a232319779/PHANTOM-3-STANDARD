@@ -14,14 +14,8 @@ int rx_callback(hackrf_transfer *transfer);
 
 // my
 int parse_opt(int argc, char* argv[], rf_param *rp);
-int scan(uint64_t freq_hz, int8_t channel);
+int scan(uint64_t freq_hz);
 
-/*
- *  period  : 112ms
- *  sample number per period : 112 * 4000000 * 2 / 1000 = 896000
- *  total : 896000 * 16 = 
- *
- */
 #define HACKRF_SAMPLE_NUMBER    262144              // 256k
 #define TIMES_PER_CHANNEL       1
 #define START_FREQ              5725000000
@@ -35,17 +29,17 @@ int scan(uint64_t freq_hz, int8_t channel);
         .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ,   \
         .sample_rate = true,                      \
         .receive = true,                           \
-        .path = "data.iq",                               \
+        .path = NULL,                               \
         .samples_to_xfer = 0,                       \
         .bytes_to_xfer = 0,                         \
         .limit_num_samples = false,                 \
-        .lna_gain = 40,                              \
+        .lna_gain = 32,                              \
         .vga_gain = 20,                             \
         .baseband_filter_bw = true,                \
         .baseband_filter_bw_hz = 1000000                  \
 }
 
-#define IF_ALL  0
+#define IF_ALL  1
 #define IF_ONE  0
 
 static hackrf_device* device = NULL;
@@ -56,7 +50,6 @@ static int do_per_channel = 0;
 static rf_param rp = RF_PARAM_INIT();
 char *buffer = NULL;
 int8_t channels[CHANNELS_NUMBER] = {0};
-int8_t g_ord[16] = {0};
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 //
@@ -85,13 +78,13 @@ int main(int argc, char *argv[])
    
 #if IF_ALL
     char file_name[255] = {0};
-    sprintf(file_name, "all.iq");
+    sprintf(file_name, "data/1M_scan_all.iq");
     fd = fopen(file_name, "wb");
 #endif
     for(i = 0; i < CHANNELS_NUMBER; i++)
     {
         fprintf(stderr, "channel number : %d\t channel frequency : %llu\n", i, freq_hz);
-        if(1 == scan(freq_hz, i))
+        if(1 == scan(freq_hz))
             channels[i] = 1;
         if ( do_exit)
             break;
@@ -114,19 +107,13 @@ int main(int argc, char *argv[])
         }
     }
     printf("\ntotal %d channels.\n", count);
-    fprintf(stdout, "\n\n");
-
-    printf("ord:\n");
-    for(i = 0; i < 16; i++)
-        printf(",%d", g_ord[i]);
-    fprintf(stdout, "\n\n");
 
     hackrf_exit();
 
     return exit_code;
 }
 
-int scan(uint64_t freq_hz, int8_t channle)
+int scan(uint64_t freq_hz)
 {
     int result;
     int isfind = 0;
@@ -153,7 +140,7 @@ int scan(uint64_t freq_hz, int8_t channle)
 
 #if IF_ONE    
     char file_name[255] = {0};
-    sprintf(file_name, "receive_%lluMHz.iq", freq_hz/FREQ_ONE_MHZ);
+    sprintf(file_name, "data/receive_%lluMHz.iq", freq_hz/FREQ_ONE_MHZ);
     fd = fopen(file_name, "wb");
 #endif
     while( (hackrf_is_streaming(device) == HACKRF_TRUE) && (do_count < TIMES_PER_CHANNEL));
@@ -161,19 +148,12 @@ int scan(uint64_t freq_hz, int8_t channle)
     //sleep(1);
     pthread_mutex_lock(&mutex);
     long start_position = -1;
-    long last_position = 0;
     uint8_t l_channel = 0;
-    uint8_t ord = -1;
     mean(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL);
     find_inter(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL); 
     if( 1 ==  work(buffer, &start_position, &l_channel))
     {
         isfind = 1;
-        ord = (int)((start_position + last_position)/56000.0+0.5)%16;
-        last_position = start_position;
-        if(g_ord[ord] != 0)
-            printf("----------conflict : prev--%d, current--%d----------\n", g_ord[ord], channle);
-        g_ord[ord] = channle;
     }
     memset(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL);
     memset(g_inter, 0, PACKET_COUNT);

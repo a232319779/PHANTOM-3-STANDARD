@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-    char *sig_file = "4M_5743_recive_0.5_11_29.iq";
+    char *sig_file = "data/4M_5743_recive_0.5_11_29.iq";
     if (argc == 2)
       sig_file = argv[1];
 

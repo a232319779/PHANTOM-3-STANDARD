@@ -19,11 +19,11 @@ int scan_signal_channel(uint64_t freq_hz);
 
 /*
  *  period  : 112ms
- *  sample number per period : 112 * 4000000 * 2 / 1000 = 896000
- *  total : 896000 * 16 = 
+ *  sample number per period : pp = 112 * DEFAULT_SAMPLE_RATE_HZ * 2 / 1000
+ *  total : mm = pp * 16  
  *
  */
-#define TIMES_PER_CHANNEL       20
+#define TIMES_PER_CHANNEL       1
 #define TOTAL_CHANNELS          16
 #define NUMBER_PER_PERIOD_ONE_CHANNEL       (112 * DEFAULT_SAMPLE_RATE_HZ * 2 / 1000 * TIMES_PER_CHANNEL)
 #define NUMBER_PER_PERIOD_ALL_CHANNELS      (NUMBER_PER_PERIOD_ONE_CHANNEL * TOTAL_CHANNELS)
@@ -34,22 +34,22 @@ int scan_signal_channel(uint64_t freq_hz);
 #define OUT_FUNCTION 1
 #define IN_FUNCTION  0
 
-#define RF_PARAM_INIT() {                             \
-        .freq_hz = START_FREQ,                 \
-        .automatic_tuning = true,                  \
-        .amp_enable = 1,                            \
-        .amp = true,                               \
-        .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ,   \
-        .sample_rate = true,                       \
-        .receive = true,                           \
-        .path = "data.iq",                               \
-        .samples_to_xfer = 0,                       \
-        .bytes_to_xfer = 0,                         \
-        .limit_num_samples = false,                 \
-        .lna_gain = 40,                              \
-        .vga_gain = 20,                             \
-        .baseband_filter_bw = true,                \
-        .baseband_filter_bw_hz = 1000000                  \
+#define RF_PARAM_INIT() { \
+        .freq_hz = DEFAULT_FREQ_HZ, \
+        .automatic_tuning = true, \
+        .amp_enable = 1, \
+        .amp = true, \
+        .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ, \
+        .sample_rate = true, \
+        .receive = true, \
+        .path = "data/1M_ALL_CHANNEL_ONE_PERIOD.iq", \
+        .samples_to_xfer = 0, \
+        .bytes_to_xfer = 0, \
+        .limit_num_samples = false, \
+        .lna_gain = 8, \
+        .vga_gain = 20, \
+        .baseband_filter_bw = true, \
+        .baseband_filter_bw_hz = 1000000 \
 }
 
 static hackrf_device* device = NULL;
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
 #if (OUT_FUNCTION || IN_FUNCTION) && IN_DEBUG
     for(i = 0; i < TOTAL_CHANNELS; i++)
         fprintf(stdout, "cost times %f at %d channel.\n", cost_times[i]/TIMES_PER_CHANNEL, channels[i]);
-    exit(0);
+    //exit(0);
 #endif
 
     // it should be in a loop if could't get the ord.
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
     
     // write local file
     FILE *fd = NULL;
-    fd = fopen("test.data", "wb");
+    fd = fopen(rp.path, "wb");
     if(NULL != fd)
     {
         fwrite(rx_buffer, 1, rx_length, fd);
@@ -143,9 +143,8 @@ int main(int argc, char *argv[])
     
 /*
     // read local file.
-    char *sig_file = "test.data";
     long file_length = 0;
-    get_signal_data(sig_file, &rx_buffer, &file_length);
+    get_signal_data(rp.path, &rx_buffer, &file_length);
     rx_length = file_length;
 */
 

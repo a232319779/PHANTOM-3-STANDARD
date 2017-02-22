@@ -24,22 +24,22 @@ int rx_callback(hackrf_transfer *transfer);
 // my
 int parse_opt(int argc, char* argv[], rf_param *rp);
 
-#define RF_PARAM_INIT() {                             \
-        .freq_hz = DEFAULT_FREQ_HZ,                 \
-        .automatic_tuning = false,                  \
-        .amp_enable = 0,                            \
-        .amp = false,                               \
-        .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ,   \
-        .sample_rate = false,                       \
-        .receive = false,                           \
-        .path = NULL,                               \
-        .samples_to_xfer = 0,                       \
-        .bytes_to_xfer = 0,                         \
-        .limit_num_samples = false,                 \
-        .lna_gain = 8,                              \
-        .vga_gain = 20,                             \
-        .baseband_filter_bw = false,                \
-        .baseband_filter_bw_hz = 0                  \
+#define RF_PARAM_INIT() { \
+        .freq_hz = DEFAULT_FREQ_HZ, \
+        .automatic_tuning = true, \
+        .amp_enable = 1, \
+        .amp = true, \
+        .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ, \
+        .sample_rate = true, \
+        .receive = true, \
+        .path = "data/1M_5743_recive_1s.iq", \
+        .samples_to_xfer = DEFAULT_SAMPLE_RATE_HZ, \
+        .bytes_to_xfer = 2 * DEFAULT_SAMPLE_RATE_HZ, \
+        .limit_num_samples = true, \
+        .lna_gain = 40, \
+        .vga_gain = 20, \
+        .baseband_filter_bw = true, \
+        .baseband_filter_bw_hz = 1000000 \
 }
 
 static transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
