@@ -316,7 +316,7 @@ int work(char *buffer, long *start_position, uint8_t *channel)
                     {
                         FILE *fd = NULL;
                         char filename[255] = {0};
-                        sprintf(filename, "could_not_demodule_%ld.iq", tmp_start);
+                        sprintf(filename, "data/could_not_demodule_%ld.iq", tmp_start);
                         fd = fopen(filename, "wb");
                         int file_dlt = 1000;
                         long len = g_inter[i+1] - g_inter[i] + file_dlt * 2;
