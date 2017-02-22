@@ -31,11 +31,11 @@
 
 #define SIGNAL_MAX_BYTES    (1+5+2+32+2)
 #define SIGNAL_MAX_BITS     SIGNAL_MAX_BYTES * 8
-#define SAMPLE_PER_SYMBOL   4
+#define SAMPLE_PER_SYMBOL   1
 
 #define PACKET_COUNT 1000
 
-#define PER_PACKET_SIZE (4000000 * 7 * 2 / 1000)
+#define PER_PACKET_SIZE ( SAMPLE_PER_SYMBOL * 1000000 * 7 * 2 / 1000)
 #define PACKET_SIZE (2 * PER_PACKET_SIZE)
 
 extern long g_inter[PACKET_COUNT];
@@ -48,14 +48,14 @@ int get_signal_data(char *filename, char **buffer, long *file_length);
 void release(char *buffer);
 
 // calculate the threshold
-int mean(char *buffer, long start, long length);
+float mean(char *buffer, long start, long length);
 
 // find the signal
 int find_inter(char *buffer, long start, long length);
 
 // work function
 // if find signal return 1, others 0.
-int work(char *buffer, long *start_position);
+int work(char *buffer, long *start_position, uint8_t *channel);
 
 /* pravite functions */
 
@@ -71,3 +71,5 @@ void packet_pack(int64_t address, uint16_t pcf, uint8_t *payload, int payload_le
 // check the crc, if the crc not match, disable the signal
 uint32_t calc_crc(const uint8_t *data, size_t data_len);
 
+// debug the could not demodule signal.
+void set_inter(long end);

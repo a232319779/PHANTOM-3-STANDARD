@@ -11,7 +11,7 @@
 #define FREQ_ONE_MHZ (1000000ull)
 #define FREQ_MIN_HZ (0ull)  /* 0 Hz */
 #define FREQ_MAX_HZ (7250000000ull) /* 7250MHz */
-#define DEFAULT_SAMPLE_RATE_HZ (4000000)   /* 4MHz default sample rate */ 
+#define DEFAULT_SAMPLE_RATE_HZ (1000000)   /* 1MHz default sample rate */ 
 #define DEFAULT_FREQ_HZ (5743000000ull) /* 5743MHz */
 #define DEFAULT_BASEBAND_FILTER_BANDWIDTH (5000000) /* 5MHz default */
 
