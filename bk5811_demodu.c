@@ -67,7 +67,7 @@ void release(char *buffer)
 }
 
 // find the threshold
-int mean(char *buffer, long start, long length)
+float mean(char *buffer, long start, long length)
 {
     unsigned long sum = 0;
     
@@ -83,9 +83,11 @@ int mean(char *buffer, long start, long length)
         }
     }
     float temp = (sum * 2.0 * DLT / length);
-    g_threshold = temp > DEFAULT_THRESHOLD ? temp : DEFAULT_THRESHOLD;
+    //g_threshold = temp > DEFAULT_THRESHOLD ? temp : DEFAULT_THRESHOLD;
+    g_threshold = temp;
 
-    return BK_SUCCESS;
+    return temp;
+//    return BK_SUCCESS;
 }
 
 
@@ -116,6 +118,12 @@ int find_inter(char *buffer, long start, long length)
         else if(mean_temp < g_threshold && 1 == is_find)
         {
             g_inter[index++] = i + sample_count * 2;
+            is_find = 2;
+        }
+        if(2 == is_find)
+        {
+            if((g_inter[index-1] - g_inter[index-2]) < SIGNAL_MAX_BITS)
+                index -=2;
             is_find = 0;
         }
     }
@@ -123,12 +131,13 @@ int find_inter(char *buffer, long start, long length)
 }
 
 // demodulate the signal
+// 使用有符号数没有问题。有些信号crc校验不过，可能是因为接收器的误差，导致有符号位翻转等原因。
 int8_t demod_bits(char *buffer, long ss, int demod_length, int sample_per_symbol)
 {
     int8_t result = 0;
     int8_t I0, Q0, I1, Q1;
     
-    for(int i = 0;i < (demod_length * sample_per_symbol * 2 - 1); i += (sample_per_symbol*2))
+    for(int i = 0;i < (demod_length * sample_per_symbol * 2 - 1); i += (sample_per_symbol * 2))
     {
         I0 = buffer[ss + i];
         Q0 = buffer[ss + i + 1];
@@ -212,7 +221,7 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 }
 
 // work function
-int work(char *buffer, long *start_position)
+int work(char *buffer, long *start_position, uint8_t *channel)
 {
     int i = 0;
     int isfind = 0;
@@ -232,6 +241,7 @@ int work(char *buffer, long *start_position)
         uint16_t crc = 0;
         uint8_t packet[45] = {0};
         uint16_t new_crc = 0;
+        long tmp_start = 0;
 
         // a signal must be more than 400bit
         if((signal_end - signal_start) > SIGNAL_MAX_BITS)
@@ -242,7 +252,7 @@ int work(char *buffer, long *start_position)
             {
                 // decode preamble
                 signal_start += signal_new_start;
-                //*start_position = signal_start;
+                tmp_start = signal_start;
 
                 preamble = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
                 
@@ -287,16 +297,13 @@ int work(char *buffer, long *start_position)
                     //
                     if(crc == new_crc)
                     {
-                        /*
-                        if(t_time1 != 0)
-                            printf("p : %f\n", (signal_start - t_time1)/8000.0);
-                        t_time1 = signal_start;
-                        */
-                        *start_position = signal_start;
-                        printf("find %d signal.\n", ++count);
+                        *start_position = tmp_start;
+                        *channel = 255 - ((address>>32)&0xff);
+                        count++;
+                        //printf("find %d signal.\n", count);
                         g_pkg_count++;
                         // print the values
-                        printf("pk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
+                        printf("channel : %d,\tpk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", *channel, g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
                         printf("payload : ");
                         for(int j = 0; j < payload_len; j++)
                             printf("%02X", packet_buffer[j]);
@@ -304,6 +311,19 @@ int work(char *buffer, long *start_position)
                         // find signal
                         isfind = 1;
                     }
+#if 0
+                    else
+                    {
+                        FILE *fd = NULL;
+                        char filename[255] = {0};
+                        sprintf(filename, "could_not_demodule_%ld.iq", tmp_start);
+                        fd = fopen(filename, "wb");
+                        int file_dlt = 1000;
+                        long len = g_inter[i+1] - g_inter[i] + file_dlt * 2;
+                        fwrite(&buffer[g_inter[i]] - file_dlt, 1, len, fd);
+                        fclose(fd);
+                    }
+#endif
                 }
             }
         }
@@ -312,4 +332,11 @@ int work(char *buffer, long *start_position)
     }
 
     return isfind;
+}
+
+// debug the could not demodule signal.
+void set_inter(long end)
+{
+    g_inter[0] = 2;
+    g_inter[1] = end;
 }

@@ -19,10 +19,11 @@ int scan(uint64_t freq_hz, int8_t channel);
 /*
  *  period  : 112ms
  *  sample number per period : 112 * 4000000 * 2 / 1000 = 896000
+ *  total : 896000 * 16 = 
  *
  */
-#define HACKRF_SAMPLE_NUMBER    262144
-#define TIMES_PER_CHANNEL       4
+#define HACKRF_SAMPLE_NUMBER    262144              // 256k
+#define TIMES_PER_CHANNEL       1
 #define START_FREQ              5725000000
 #define CHANNELS_NUMBER         125
 
@@ -32,7 +33,7 @@ int scan(uint64_t freq_hz, int8_t channel);
         .amp_enable = 1,                            \
         .amp = true,                               \
         .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ,   \
-        .sample_rate = true,                       \
+        .sample_rate = true,                      \
         .receive = true,                           \
         .path = "data.iq",                               \
         .samples_to_xfer = 0,                       \
@@ -45,7 +46,7 @@ int scan(uint64_t freq_hz, int8_t channel);
 }
 
 #define IF_ALL  0
-#define IF_ONE  1
+#define IF_ONE  0
 
 static hackrf_device* device = NULL;
 volatile uint32_t byte_count = 0;
@@ -161,10 +162,11 @@ int scan(uint64_t freq_hz, int8_t channle)
     pthread_mutex_lock(&mutex);
     long start_position = -1;
     long last_position = 0;
+    uint8_t l_channel = 0;
     uint8_t ord = -1;
     mean(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL);
     find_inter(buffer, 0, HACKRF_SAMPLE_NUMBER * TIMES_PER_CHANNEL); 
-    if( 1 ==  work(buffer, &start_position))
+    if( 1 ==  work(buffer, &start_position, &l_channel))
     {
         isfind = 1;
         ord = (int)((start_position + last_position)/56000.0+0.5)%16;

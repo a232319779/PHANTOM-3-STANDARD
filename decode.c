@@ -10,13 +10,15 @@ int main(int argc, char *argv[])
     char *buffer = NULL;
     long file_length = 0;
     long start_position = -1;
+    uint8_t channel = 0;
 
     get_signal_data(sig_file, &buffer, &file_length);
     
     memset(g_inter, 0, sizeof(g_inter));
     mean(buffer, 0, file_length);
     find_inter(buffer, 0, file_length);
-    work(buffer, &start_position);
+    //set_inter(file_length);
+    work(buffer, &start_position, &channel);
 
     printf("end.\n");
     //release the memory.
