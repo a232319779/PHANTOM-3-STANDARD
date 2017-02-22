@@ -32,5 +32,9 @@
 *.dSYM/
 *.su
 
-# Data files
+# dir
+/test_dir/
 /data/
+
+# YCM config file
+.ycm_extra_conf.py
