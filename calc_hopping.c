@@ -23,7 +23,7 @@ int scan_signal_channel(uint64_t freq_hz);
  *  total : mm = pp * 16  
  *
  */
-#define TIMES_PER_CHANNEL       1
+#define TIMES_PER_CHANNEL       2
 #define TOTAL_CHANNELS          16
 #define NUMBER_PER_PERIOD_ONE_CHANNEL       (112 * DEFAULT_SAMPLE_RATE_HZ * 2 / 1000 * TIMES_PER_CHANNEL)
 #define NUMBER_PER_PERIOD_ALL_CHANNELS      (NUMBER_PER_PERIOD_ONE_CHANNEL * TOTAL_CHANNELS)
@@ -33,6 +33,8 @@ int scan_signal_channel(uint64_t freq_hz);
 #define IN_DEBUG     1   
 #define OUT_FUNCTION 1
 #define IN_FUNCTION  0
+#define REAL_TIME_DATA 1
+#define LOCAL_DATA   0
 
 #define RF_PARAM_INIT() { \
         .freq_hz = DEFAULT_FREQ_HZ, \
@@ -46,7 +48,7 @@ int scan_signal_channel(uint64_t freq_hz);
         .samples_to_xfer = 0, \
         .bytes_to_xfer = 0, \
         .limit_num_samples = false, \
-        .lna_gain = 8, \
+        .lna_gain = 40, \
         .vga_gain = 20, \
         .baseband_filter_bw = true, \
         .baseband_filter_bw_hz = 1000000 \
@@ -69,7 +71,8 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int main(int argc, char *argv[])
 {
     int exit_code = EXIT_SUCCESS;
-    
+
+#if REAL_TIME_DATA    
     int result;
     int8_t i;
 #if OUT_FUNCTION && IN_DEBUG
@@ -140,13 +143,14 @@ int main(int argc, char *argv[])
         fwrite(rx_buffer, 1, rx_length, fd);
         fclose(fd);
     }
-    
-/*
+#endif
+
+#if LOCAL_DATA
     // read local file.
     long file_length = 0;
     get_signal_data(rp.path, &rx_buffer, &file_length);
     rx_length = file_length;
-*/
+#endif
 
     float dlt = 0;
     long first_position = 0;
@@ -175,7 +179,7 @@ int main(int argc, char *argv[])
             dlt = (last_position - first_position) * 1000.0 / (DEFAULT_SAMPLE_RATE_HZ * 2 * 7) + 0.5;
             dlt_time = (int)(dlt) % TOTAL_CHANNELS;
             float a = last_position * 1000.0 / (DEFAULT_SAMPLE_RATE_HZ * 2 * 7) + 0.5;
-            printf("channel : %d\tg_threshold : %f\tdlt_time : %f<-->%d\ttime : %f<-->%d\n", channels[i/split], threshold, dlt, dlt_time, a, (int)(a)%16); 
+            printf("channel : %d<-->%d\tg_threshold : %f\tdlt_time : %f<-->%d\ttime : %f<-->%d\n", channels[i/split], l_channel, threshold, dlt, dlt_time, a, (int)(a)%16); 
             g_ord[dlt_time] = channels[i/split];
         }
     }
