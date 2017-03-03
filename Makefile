@@ -22,11 +22,11 @@ endif
 # if the .h has been modified, should be recompile.
 # compile
 # no need hackrf header
-$(bk5811_demodu_objects) $(decode_objects) : bk5811_demodu.h
+$(bk5811_demodu_objects) $(decode_objects) : bk5811_demodu.h packet_common.h
 $(bk5811_demodu_objects) $(decode_objects) : %.o : %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 # need hackrf header
-$(capture_objects) $(scan_phantom_objects) $(calc_hopping_objects) : common.h bk5811_demodu.h
+$(capture_objects) $(scan_phantom_objects) $(calc_hopping_objects) : rf_common.h bk5811_demodu.h
 $(capture_objects) $(scan_phantom_objects) $(calc_hopping_objects) : %.o : %.c
 	$(CC) $(CFLAGS) $(HACKRF_INCLUDE) -c $< -o $@
 	

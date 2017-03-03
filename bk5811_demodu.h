@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "packet_common.h"
+
 #ifndef BK5811_DEMODU_H
 #define BK5811_DEMODU_H
 #endif
@@ -29,7 +31,12 @@
 #define BK_CRC_BITS         (2*8)
 
 
-#define SIGNAL_MAX_BYTES    (1+5+2+32+2)
+#define PREAMBLE_LEN        1
+#define ADDRESS_LEN         5
+#define PCF_LEN             2
+#define PAYLOAD_LEN         32
+#define CRC_LEN             2
+#define SIGNAL_MAX_BYTES    (PREAMBLE_LEN+ADDRESS_LEN+PCF_LEN+PAYLOAD_LEN+CRC_LEN)
 #define SIGNAL_MAX_BITS     SIGNAL_MAX_BYTES * 8
 #define SAMPLE_PER_SYMBOL   1
 
@@ -39,6 +46,14 @@
 #define PACKET_SIZE (2 * PER_PACKET_SIZE)
 
 extern long g_inter[PACKET_COUNT];
+
+typedef struct _PACKET_{
+    int32_t preamble;
+    int64_t address;
+    int16_t pcf;
+    int8_t  payload[PAYLOAD_LEN];
+    int16_t crc;
+}packet;
 
 // read signal from file
 // g_buffer : malloc in this function, and should be freed by release() function
@@ -55,7 +70,7 @@ int find_inter(char *buffer, long start, long length);
 
 // work function
 // if find signal return 1, others 0.
-int work(char *buffer, long *start_position, uint8_t *channel);
+int work(char *buffer, long *start_position, uint8_t *channel, packet_param *lpp);
 
 /* pravite functions */
 
@@ -63,7 +78,7 @@ int work(char *buffer, long *start_position, uint8_t *channel);
 int8_t demod_bits(char *buffer, long ss, int demod_length, int sample_per_symbol);
 
 // search the preamble
-long search_preamble(char *buffer, long ss, long sig_len, int match_length, int sample_per_symbol);
+long search_preamble(char *buffer, long ss, long sig_len, int match_length, int preamble_bytes, uint64_t dest_preamble, int sample_per_symbol);
 
 // value to bytes array
 void packet_pack(int64_t address, uint16_t pcf, uint8_t *payload, int payload_len, uint8_t *packet);
