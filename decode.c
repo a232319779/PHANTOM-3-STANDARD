@@ -3,11 +3,13 @@
 #include "bk5811_demodu.h"
 
 static packet_param pp = INIT_PP();
+
 static void usage();
 int parse_u32(char* s, uint32_t* const value); 
 int parse_u64(char* s, uint64_t* const value);
 int parse_opt(int argc, char *argv[], packet_param *pp);
 
+// default file.  use for test.
 char *sig_file = "data/1M_5738_recive_1s.iq";
 
 
@@ -20,23 +22,26 @@ int main(int argc, char *argv[])
     }
     char *buffer = NULL;
     long file_length = 0;
+    long read_length = 0;
+    long read_offset = 0;
     long start_position = -1;
     uint8_t channel = 0;
-    long size_per_period, end = 0;
-
-    get_signal_data(sig_file, &buffer, &file_length);
+    long size_per_period;
 
     size_per_period = (pp.sample_rate * pp.slot_number * pp.period * 2 / 1000);
-    
-    for(int i = 0; i < file_length; i += size_per_period)
+    file_length = get_file_size(sig_file);
+    read_length = size_per_period * 1;
+    buffer = (char *)malloc(read_length);
+    while(read_offset < file_length)
     {
-        end = file_length - i;
-        end = end < size_per_period ? end : size_per_period;
         memset(g_inter, 0, sizeof(g_inter));
-        mean(buffer, i, end);
-        find_inter(buffer, i, end);
+        memset(buffer, 0, read_length);
+        get_signal_data(sig_file, buffer, read_offset, &read_length);
+        read_offset += read_length;
+        mean(buffer, 0, read_length);
+        find_inter(buffer, 0, read_length);
         //set_inter(file_length);
-        work(buffer, &start_position, &channel, &pp);
+        work(buffer, &pp, &start_position, &channel);
     }
     printf("end.\n");
     //release the memory.

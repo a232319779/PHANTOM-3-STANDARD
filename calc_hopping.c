@@ -26,7 +26,6 @@ int scan_signal_channel(uint64_t freq_hz);
 #define TOTAL_CHANNELS          16
 #define NUMBER_PER_PERIOD_ONE_CHANNEL       (112 * DEFAULT_SAMPLE_RATE_HZ * 2 / 1000 * TIMES_PER_CHANNEL)
 #define NUMBER_PER_PERIOD_ALL_CHANNELS      (NUMBER_PER_PERIOD_ONE_CHANNEL * TOTAL_CHANNELS)
-#define START_FREQ              5725000000
 
 // debug info
 #define IN_DEBUG     1   
@@ -134,8 +133,10 @@ int main(int argc, char *argv[])
 
 #if LOCAL_DATA
     // read local file.
-    long file_length = 0;
-    get_signal_data(file_name, &rx_buffer, &file_length);
+    long file_length = get_file_size(file_name);
+    long read_length = 0;
+    rx_buffer = (char *)malloc(file_length);
+    get_signal_data(file_name, rx_buffer, 0, &read_length);
     rx_length = file_length;
     fprintf(stdout, "Read signal from \"%s\" file.\n ", file_name);
 #endif
@@ -157,7 +158,7 @@ int main(int argc, char *argv[])
         threshold = mean(rx_buffer, begin, step); 
         find_inter(rx_buffer, begin, step); 
 
-        if( 1 == work(rx_buffer, &last_position, &l_channel, &pp))
+        if( 1 == work(rx_buffer, &pp, &last_position, &l_channel))
         {
             //  first signal position
             if(first_position == 0)
