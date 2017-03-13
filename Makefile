@@ -36,13 +36,13 @@ decode : $(bk5811_demodu_objects) $(decode_objects)
 	$(CC) -o decode $(CFLAGS) $(bk5811_demodu_objects) $(decode_objects)
 # capture nedd hackrf libs
 capture : $(capture_objects) 
-	$(CC) -o capture $(CFLAGS) $(HACKRF_LIB) $(capture_objects)
+	$(CC) -o capture $(CFLAGS) $(capture_objects) $(HACKRF_LIB) 
 # scan_phantom need hackrf libs
 scan_phantom : $(scan_phantom_objects) $(bk5811_demodu_objects) 
-	$(CC) -o scan_phantom $(CFLAGS) $(HACKRF_LIB) $(scan_phantom_objects) $(bk5811_demodu_objects) 
+	$(CC) -o scan_phantom $(CFLAGS) $(scan_phantom_objects) $(HACKRF_LIB) $(bk5811_demodu_objects) 
 # calc_hopping need hackrf libs
 calc_hopping : $(calc_hopping_objects) $(bk5811_demodu_objects) 
-	$(CC) -o calc_hopping $(CFLAGS) $(HACKRF_LIB) $(calc_hopping_objects) $(bk5811_demodu_objects) 
+	$(CC) -o calc_hopping $(CFLAGS) $(calc_hopping_objects) $(HACKRF_LIB) $(bk5811_demodu_objects) 
 
 .PHONY : clean
 clean :
