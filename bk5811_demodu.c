@@ -272,7 +272,7 @@ int work(IN char *buffer, IN packet_param *lpp, OUT long *start_position,OUT uin
                 while(preamble_len--)
                 {
                     preamble <<= 8;
-                    preamble |= (uint8_t)demod_bits(buffer, signal_start, 8, sample_per_symbol);
+                    preamble |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
                     signal_start += (8 * sample_per_symbol * 2);
                 }
                 
@@ -286,10 +286,10 @@ int work(IN char *buffer, IN packet_param *lpp, OUT long *start_position,OUT uin
                 // decode pcf
                 if(lpp->is_use_pcf == 1)
                 {
-                    pcf |= (uint8_t)demod_bits(buffer, signal_start, 8, sample_per_symbol);
+                    pcf |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
                     signal_start += (8 * sample_per_symbol * 2);
                     pcf <<= 1;
-                    uint8_t temp = (uint8_t)demod_bits(buffer, signal_start, 8, sample_per_symbol);
+                    uint8_t temp = (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
                     temp >>= 7;
                     pcf |= temp;
                     
@@ -301,7 +301,7 @@ int work(IN char *buffer, IN packet_param *lpp, OUT long *start_position,OUT uin
                     // decode payload
                     signal_start += (1 * sample_per_symbol * 2);
                     for (int j = 0; j < payload_len; j++) {
-                        packet_buffer[j] = demod_bits(buffer, signal_start, 8, sample_per_symbol);
+                        packet_buffer[j] = (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
                         signal_start += (8 * sample_per_symbol * 2);
                     }
                 
@@ -310,19 +310,19 @@ int work(IN char *buffer, IN packet_param *lpp, OUT long *start_position,OUT uin
                     while(crc_len--)
                     {
                         crc <<= 8;
-                        crc |= demod_bits(buffer, signal_start, 8, sample_per_symbol);
+                        crc |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
                         signal_start += (8 * sample_per_symbol * 2);
                     }
                     packet_pack(address, pcf, packet_buffer, payload_len, packet);
                     new_crc = calc_crc(packet, payload_len + 7);
                 
                     //
-                    //if(crc == new_crc)
+                    if(crc == new_crc)
                     {
                         *start_position = tmp_start;
                         *channel = 255 - ((address>>32)&0xff);
                         count++;
-                        printf("find %d signal.\n", count);
+                        //printf("find %d signal.\n", count);
                         g_pkg_count++;
                         // print the values
                         printf("channel : %d,\tpk_count : %d,\tpreamble : %llX,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", *channel, g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
