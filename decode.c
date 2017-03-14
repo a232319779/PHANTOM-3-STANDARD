@@ -1,173 +1,118 @@
 #include <memory.h>
 #include <getopt.h>
 #include "bk5811_demodu.h"
-
-static packet_param pp = INIT_PP();
+#include "parse_opt.h"
 
 static void usage();
-int parse_u32(char* s, uint32_t* const value); 
-int parse_u64(char* s, uint64_t* const value);
-int parse_opt(int argc, char *argv[], packet_param *pp);
+int parse_opt(int argc, char *argv[]);
 
-// default file.  use for test.
-char *sig_file = "data/1M_5738_recive_1s.iq";
+extern packet_param pp;
 
 
 int main(int argc, char *argv[])
 {
+    s_packet *sp = NULL;
+    decode_param *dp = NULL;
+
+    // default signal file
+    rp.path = "data/1M_5738_recive_1s.iq";
+
     if (argc > 1)
     {
-        if(-2 == parse_opt(argc, argv, &pp))
+        if(-2 == parse_opt(argc, argv))
             return -1;
     }
     char *buffer = NULL;
     long file_length = 0;
     long read_length = 0;
     long read_offset = 0;
-    long start_position = -1;
-    uint8_t channel = 0;
     long size_per_period;
+    float diff_time;
+    long start_p = 0;
+    float period = 99999999.9;
+
+    dp = (decode_param *)malloc(sizeof(decode_param));
+    sp = (s_packet *)malloc(sizeof(s_packet));
 
     size_per_period = (pp.sample_rate * pp.slot_number * pp.period * 2 / 1000);
-    file_length = get_file_size(sig_file);
+    file_length = get_file_size(rp.path);
     read_length = size_per_period * 1;
     buffer = (char *)malloc(read_length);
     while(read_offset < file_length)
     {
-        memset(g_inter, 0, sizeof(g_inter));
+        // init
+        memset(dp, 0, sizeof(decode_param));
         memset(buffer, 0, read_length);
-        get_signal_data(sig_file, buffer, read_offset, &read_length);
+        
+        // read data
+        get_signal_data(rp.path, buffer, read_offset, &read_length);
         read_offset += read_length;
-        mean(buffer, 0, read_length);
-        find_inter(buffer, 0, read_length);
-        //set_inter(file_length);
-        work(buffer, &pp, &start_position, &channel);
+
+        // get threshold and inter[]
+        mean(buffer, 0, read_length, dp);
+        find_inter(buffer, 0, read_length, dp);
+
+        diff_time = 0.0;
+        // demodulate
+        while(dp->current < dp->total)
+        {
+            memset(sp, 0, sizeof(s_packet));
+
+            int iret =  work(buffer, dp, &pp, sp);
+            if(1 == iret)
+            {
+                printf("channel : %d,\tpreamble : %llX,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", sp->channel, sp->preamble, sp->address, sp->payload_len, sp->pid, sp->no_ack);
+                printf("payload : ");
+                for(int j = 0; j < sp->payload_len; j++)
+                    printf("%02X", sp->packet_buffer[j]);
+                printf(",\tcrc : %llX\n", sp->crc);
+
+                if(start_p != 0)
+                {
+                    diff_time = calc_diff_time(start_p, sp->start_position + read_offset, pp.sample_rate);
+                    //printf("diff_time : %f\n", diff_time);
+                    if(diff_time < period)
+                        period = diff_time;
+                }
+                start_p = sp->start_position + read_offset;
+            }
+            dp->current += 2;
+        }
     }
+    printf("!!! : %fms may be the period.\n", period);
     printf("end.\n");
+
     //release the memory.
     release(buffer);
+    free(dp);
+    dp = NULL;
+    free(sp);
+    sp = NULL;
 
     return 0;
 }
+
 static void usage()
 {
     printf("Usage:\n");
-    printf("\t[-a] # preamble length [1 to 8].Default 1.\n");
-    printf("\t[-b] # preamble [1 to 8 bytes].Default \'0xAA\'.\n");
-    printf("\t[-c] # mac address [1 to 5].Default 5.\n");
-    printf("\t[-d] # if use esb [1 yes, 0 no].Default 1.\n");
-    printf("\t[-e] # pcf len. Default 2.\n");
-    printf("\t[-f] # crc len. Default 2.\n");
-    printf("\t[-x] # slot number. Default 16.\n");
-    printf("\t[-y] # period per signal.Deafult 7(ms).\n");
-    printf("\t[-z] # signal file. Default \'data/4M_5743_recive_0.5_11_29.iq\'.\n");
-    printf("\t[-s] # sample rate. Deafult 1MHz.\n");
     printf("\t[-h] # Display this text.\n");
+    printf("\t[-i] # preamble length [1 to 8].Default 1.\n");
+    printf("\t[-j] # preamble [1 to 8 bytes].Default \'0xAA\'.\n");
+    printf("\t[-m] # mac address [1 to 5].Default 5.\n");
+    printf("\t[-e] # if use esb [1 yes, 0 no].Default 1.\n");
+    printf("\t[-p] # pcf len. Default 2.\n");
+    printf("\t[-c] # crc len. Default 2.\n");
+    printf("\t[-t] # slot number. Default 16.\n");
+    printf("\t[-y] # period per signal.Deafult 7(ms).\n");
+    printf("\t[-r] # signal file. Default \'data/4M_5743_recive_0.5_11_29.iq\'.\n");
+    printf("\t[-s] # sample rate. Deafult 1MHz.\n");
+    printf("Default set : -i 1 -j 0xAA -m 5 -e 1 -p 2 -c 2 -t 16 -y 7 -s 1000000 -r data/1M_5738_recive_1s.iq\n");
 }
-
-int parse_opt(int argc, char *argv[], packet_param *pp)
+int parse_opt(int argc, char *argv[])
 {
-    int opt;
-    int result;
-    
-    while( (opt = getopt(argc, argv, "ha:b:c:d:e:f:x:y:z:s:")) != EOF)
-    {
-       switch( opt )
-       {
-           case 'h' :
-               usage();
-               exit(0);
-           case 'a' :
-               pp->preamble_len = (uint8_t)atoi(optarg);
-               break;
-           case 'b' :
-               result = parse_u64(optarg, &pp->dest_preamble);
-               break;
-           case 'c' :
-               pp->address_len = (uint8_t)atoi(optarg);
-               break;
-           case 'd' :
-               pp->is_use_pcf = (uint8_t)atoi(optarg);
-               break;
-           case 'e' :
-               pp->pcf_len = (uint8_t)atoi(optarg);
-               break;
-           case 'f' :
-               pp->crc_len = (uint8_t)atoi(optarg);
-               break;
-           case 'x' :
-               result = parse_u32(optarg, &pp->slot_number);
-               break;
-           case 'y' :
-               result = parse_u32(optarg, &pp->period);
-               break;
-           case 'z' :
-               sig_file = optarg;
-               break;
-           case 's':
-               result = parse_u64(optarg, &pp->sample_rate);
-               break;
-           default :
-               fprintf(stderr, "unknown argument '-%c %s'", opt, optarg);
-               usage();
-               return EXIT_FAILURE;
-       }
-    }
-    return result;
-    
-}
 
-int parse_u32(char* s, uint32_t* const value) {
-	uint_fast8_t base = 10;
-	char* s_end;
-	uint64_t ulong_value;
+    char *opt_selcet = "hi:j:m:e:p:c:t:y:r:s:";
+    parse_opt_param(argc, argv, opt_selcet, usage);
 
-	if( strlen(s) > 2 ) {
-		if( s[0] == '0' ) {
-			if( (s[1] == 'x') || (s[1] == 'X') ) {
-				base = 16;
-				s += 2;
-			} else if( (s[1] == 'b') || (s[1] == 'B') ) {
-				base = 2;
-				s += 2;
-			}
-		}
-	}
-
-	s_end = s;
-	ulong_value = strtoul(s, &s_end, base);
-	if( (s != s_end) && (*s_end == 0) ) {
-		*value = (uint32_t)ulong_value;
-		return 0;
-	} else {
-		return -2;
-	}
-}
-
-int parse_u64(char* s, uint64_t* const value) 
-{
-	uint_fast8_t base = 10;
-	char* s_end;
-	uint64_t u64_value;
-
-	if( strlen(s) > 2 ) {
-		if( s[0] == '0' ) {
-			if( (s[1] == 'x') || (s[1] == 'X') ) {
-				base = 16;
-				s += 2;
-			} else if( (s[1] == 'b') || (s[1] == 'B') ) {
-				base = 2;
-				s += 2;
-			}
-		}
-	}
-
-	s_end = s;
-	u64_value = strtoull(s, &s_end, base);
-	if( (s != s_end) && (*s_end == 0) ) {
-		*value = u64_value;
-		return 0;
-	} else {
-		return -2;
-	}
+    return 0;
 }

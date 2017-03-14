@@ -46,6 +46,9 @@ int start, end;
 int cost = 0;
 int8_t g_ord[16] = {0};
 static packet_param pp = INIT_PP();
+static rf_param rp = RF_PARAM_INIT();
+decode_param *dp = NULL;
+s_packet *sp = NULL;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char *argv[])
@@ -141,6 +144,9 @@ int main(int argc, char *argv[])
     fprintf(stdout, "Read signal from \"%s\" file.\n ", file_name);
 #endif
 
+    dp = (decode_param *)malloc(sizeof(decode_param));
+    sp = (s_packet *)malloc(sizeof(s_packet));
+
     float times = 0;
     long first_position = 0;
     long last_position = 0;
@@ -153,12 +159,13 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < TOTAL_CHANNELS * split; i++ )
     {
-        memset(g_inter, 0, sizeof(g_inter));
+        memset(dp, 0, sizeof(decode_param));
+        memset(sp, 0, sizeof(s_packet));
         begin = i * NUMBER_PER_PERIOD_ONE_CHANNEL / split;
-        threshold = mean(rx_buffer, begin, step); 
-        find_inter(rx_buffer, begin, step); 
+        threshold = mean(rx_buffer, begin, step, dp); 
+        find_inter(rx_buffer, begin, step, dp); 
 
-        if( 1 == work(rx_buffer, &pp, &last_position, &l_channel))
+        if( 1 == work(rx_buffer, dp, &pp, sp))
         {
             //  first signal position
             if(first_position == 0)
@@ -179,6 +186,8 @@ int main(int argc, char *argv[])
     fprintf(stdout, "\n");
 
     free(rx_buffer);
+    free(dp);
+    free(sp);
     rx_buffer = NULL;
     hackrf_exit();
 

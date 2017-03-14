@@ -1,6 +1,5 @@
-#ifndef _COMMON_H_
-#define _COMMON_H_
-#endif
+#ifndef _RF_COMMON_H
+#define _RF_COMMON_H
 
 #include <stdio.h>
 #include <stdint.h>
@@ -80,7 +79,7 @@ typedef struct _rf_param{
 }
 
 // global rf param
-rf_param rp = RF_PARAM_INIT();
+//rf_param rp = RF_PARAM_INIT();
 
 #define CHECK_RESULT(result, error_name)    if(result != HACKRF_SUCCESS) {  \
         fprintf(stderr, "%s failed: %s (%d).\n",                                \
@@ -95,3 +94,5 @@ rf_param rp = RF_PARAM_INIT();
         }else {                                                                 \
                 fprintf(stderr, "%s done.\n", error_name);                              \
         }
+
+#endif

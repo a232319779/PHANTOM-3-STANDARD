@@ -1,3 +1,5 @@
+#ifndef _PACKET_COMMON_H_
+#define _PACKET_COMMON_H_
 
 #include<stdint.h>
 
@@ -12,6 +14,21 @@
 #define DEFAULT_SAMPLE (ONE_MHZ * 1) 
 #endif
 
+// packet
+typedef struct _PACKET_{
+    // ESB packet
+    uint64_t preamble;
+    uint64_t address;
+    uint16_t payload_len;
+    uint8_t pid;
+    uint8_t no_ack;
+    uint8_t packet_buffer[64];
+    uint64_t crc;
+    // ESB packet end
+    uint8_t channel;
+    long start_position;
+}s_packet;
+
 // packet param
 typedef struct _PACKET_PARAM{
     uint8_t preamble_len;       /*  byte    */
@@ -24,6 +41,7 @@ typedef struct _PACKET_PARAM{
     uint32_t period;            /*  ms  */
     uint64_t sample_rate;       /*  hz  */
     int sampler_per_symbol;     /*  per/MHz */
+    uint8_t size_per_channel;   /*  MHz */
     uint64_t start_freq;        /*  which frequence start to scan : MHz*/
     uint32_t channel_number;    /*  how many channel should be scanned.*/
 }packet_param;
@@ -39,6 +57,12 @@ typedef struct _PACKET_PARAM{
     .period = 7, \
     .sample_rate = DEFAULT_SAMPLE, \
     .sampler_per_symbol = (DEFAULT_SAMPLE / ONE_MHZ), \
+    .size_per_channel = 1, \
     .start_freq = START_FREQ, \
     .channel_number = CHANNELS_NUMBERS \
 };
+
+// global pp
+//packet_param pp = INIT_PP();
+
+#endif

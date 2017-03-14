@@ -6,30 +6,19 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "rf_common.h"
-
-#define U64TOA_MAX_DIGIT (31)
-typedef struct _t_u64toa{
-    char data[U64TOA_MAX_DIGIT+1];
-} t_u64toa;
-
+#include "parse_opt.h"
 
 t_u64toa ascii_u64_data1;
 t_u64toa ascii_u64_data2;
+
 
 static void usage();
 
 void sigint_callback_handler(int signum);
 int rx_callback(hackrf_transfer *transfer);
 
-char* u64toa(uint64_t val, t_u64toa* str);
-int parse_u32(char* s, uint32_t* const value); 
-int parse_u64(char* s, uint64_t* const value);
-static char *stringrev(char *str);
-static float TimevalDiff(const struct timeval *a, const struct timeval *b);
-
 // my
-int parse_opt(int argc, char* argv[], rf_param *rp);
+int parse_opt(int argc, char* argv[]);
 
 static transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
 static hackrf_device* device = NULL;
@@ -38,7 +27,7 @@ volatile uint32_t byte_count = 0;
 static bool do_exit = false;
 struct timeval time_start;
 struct timeval t_start;
-
+extern rf_param rp;
 
 int main(int argc, char *argv[])
 {
@@ -53,7 +42,7 @@ int main(int argc, char *argv[])
 
     if (argc > 1)
     {
-        result = parse_opt(argc, argv, &rp);
+        result = parse_opt(argc, argv);
         if (result == EXIT_FAILURE)
             return -1;
     }
@@ -212,6 +201,7 @@ int main(int argc, char *argv[])
 static void usage()
 {
     printf("Usage:\n");
+    printf("\t[-h help] # Display this text.\n");
     printf("\t[-f freq_hz] # Frequency in Hz [%sMHz to %sMHz].\n",
             u64toa((FREQ_MIN_HZ/FREQ_ONE_MHZ), &ascii_u64_data1),
             u64toa((FREQ_MAX_HZ/FREQ_ONE_MHZ), &ascii_u64_data2));
@@ -222,79 +212,15 @@ static void usage()
            u64toa((DEFAULT_SAMPLE_RATE_HZ/FREQ_ONE_MHZ),&ascii_u64_data1));
     printf("\t[-n num_samples] # Number of samples to transfer (default is unlimited).\n");
     printf("\t[-r <filename>] # Receive data into file (use '-' for stdout).\n");
-    printf("Default set : freq_hz = 5738MHz, amp_enable = 1, lna_gain = 32, vga_gain = 20, sample_rate = 1MHz, num_samples = 1*sample_rate, filename = data/1M_5738_recive_1s.iq\n");
+    printf("Default set : -f 5738000000 -a 1 -l 32 -g 20 -s 1000000 -n 1000000 -r data/1M_5738_recive_1s.iq\n");
 }
 
-
-// my
-int parse_opt(int argc, char *argv[], rf_param *rp)
+int parse_opt(int argc, char *argv[])
 {
-    int opt;
-    int result;
-    char* endptr;
-    double f_hz;
+    char *opt_select = "hf:a:l:g:n:r:s:";
+    parse_opt_param(argc, argv, opt_select, usage);
     
-    while( (opt = getopt(argc, argv, "hf:a:l:g:s:n:r:b:")) != EOF)
-    {
-       result = HACKRF_SUCCESS;
-       switch( opt )
-       {
-           case 'h' :
-               usage();
-               exit(0);
-           case 'f' :
-               f_hz = strtod(optarg, &endptr);
-               if (optarg == endptr) {
-                   result = HACKRF_ERROR_INVALID_PARAM;
-                   break;
-               }
-               rp->freq_hz = f_hz;
-               rp->automatic_tuning = true;
-               break;
-           case 'a' :
-               rp->amp = true;
-               result = parse_u32(optarg, &rp->amp_enable);
-               break;
-           case 'l' :
-               result = parse_u32(optarg, &rp->lna_gain);
-               break;
-           case 'g' :
-               result = parse_u32(optarg, &rp->vga_gain);
-               break;
-           case 's' :
-               f_hz = strtod(optarg, &endptr);
-               if (optarg == endptr) {
-                   result = HACKRF_ERROR_INVALID_PARAM;
-                   break;
-               }
-               rp->sample_rate_hz = f_hz;
-               rp->sample_rate = true;
-               break;
-           case 'n' :
-               rp->limit_num_samples = true;
-               result = parse_u64(optarg, &rp->samples_to_xfer);
-               rp->bytes_to_xfer = rp->samples_to_xfer * 2ull;
-               break;
-           case 'r' :
-               rp->receive = true;
-               rp->path = optarg;
-               break;
-           case 'b' :
-               f_hz = strtod(optarg, &endptr);
-               if (optarg == endptr) {
-                   result = HACKRF_ERROR_INVALID_PARAM;
-                   break;
-               }
-               rp->baseband_filter_bw_hz = f_hz;
-               rp->baseband_filter_bw = true;
-               break;
-           default :
-               fprintf(stderr, "unknown argument '-%c %s'", opt, optarg);
-               usage();
-               return EXIT_FAILURE;
-       }
-    }
-    return result;
+    return 0;
 }
 
 void sigint_callback_handler(int signum)
@@ -329,112 +255,5 @@ int rx_callback(hackrf_transfer *transfer)
 	} else {
 		return -1;
     } 
-}
-
-char* u64toa(uint64_t val, t_u64toa* str)
-{
-	#define BASE (10ull) /* Base10 by default */
-	uint64_t sum;
-	int pos;
-	int digit;
-	int max_len;
-	char* res;
-
-	sum = val;
-	max_len = U64TOA_MAX_DIGIT;
-	pos = 0;
-
-	do
-	{
-		digit = (sum % BASE);
-		str->data[pos] = digit + '0';
-		pos++;
-
-		sum /= BASE;
-	}while( (sum>0) && (pos < max_len) );
-
-	if( (pos == max_len) && (sum>0) )
-		return NULL;
-
-	str->data[pos] = '\0';
-	res = stringrev(str->data);
-
-	return res;
-}
-
-static char *stringrev(char *str)
-{
-	char *p1, *p2;
-
-	if(! str || ! *str)
-		return str;
-
-	for(p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
-	{
-		*p1 ^= *p2;
-		*p2 ^= *p1;
-		*p1 ^= *p2;
-	}
-	return str;
-}
-
-int parse_u32(char* s, uint32_t* const value) {
-	uint_fast8_t base = 10;
-	char* s_end;
-	uint64_t ulong_value;
-
-	if( strlen(s) > 2 ) {
-		if( s[0] == '0' ) {
-			if( (s[1] == 'x') || (s[1] == 'X') ) {
-				base = 16;
-				s += 2;
-			} else if( (s[1] == 'b') || (s[1] == 'B') ) {
-				base = 2;
-				s += 2;
-			}
-		}
-	}
-
-	s_end = s;
-	ulong_value = strtoul(s, &s_end, base);
-	if( (s != s_end) && (*s_end == 0) ) {
-		*value = (uint32_t)ulong_value;
-		return HACKRF_SUCCESS;
-	} else {
-		return HACKRF_ERROR_INVALID_PARAM;
-	}
-}
-
-int parse_u64(char* s, uint64_t* const value) 
-{
-	uint_fast8_t base = 10;
-	char* s_end;
-	uint64_t u64_value;
-
-	if( strlen(s) > 2 ) {
-		if( s[0] == '0' ) {
-			if( (s[1] == 'x') || (s[1] == 'X') ) {
-				base = 16;
-				s += 2;
-			} else if( (s[1] == 'b') || (s[1] == 'B') ) {
-				base = 2;
-				s += 2;
-			}
-		}
-	}
-
-	s_end = s;
-	u64_value = strtoull(s, &s_end, base);
-	if( (s != s_end) && (*s_end == 0) ) {
-		*value = u64_value;
-		return HACKRF_SUCCESS;
-	} else {
-		return HACKRF_ERROR_INVALID_PARAM;
-	}
-}
-
-static float TimevalDiff(const struct timeval *a, const struct timeval *b)
-{
-   return (a->tv_sec - b->tv_sec) + 1e-6f * (a->tv_usec - b->tv_usec);
 }
 
