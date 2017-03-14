@@ -104,7 +104,7 @@ static void usage()
     printf("\t[-c] # crc len. Default 2.\n");
     printf("\t[-t] # slot number. Default 16.\n");
     printf("\t[-y] # period per signal.Deafult 7(ms).\n");
-    printf("\t[-r] # signal file. Default \'data/4M_5743_recive_0.5_11_29.iq\'.\n");
+    printf("\t[-r] # signal file. Default \'data/1M_5748_recive_1s.iq\'.\n");
     printf("\t[-s] # sample rate. Deafult 1MHz.\n");
     printf("Default set : -i 1 -j 0xAA -m 5 -e 1 -p 2 -c 2 -t 16 -y 7 -s 1000000 -r data/1M_5738_recive_1s.iq\n");
 }
