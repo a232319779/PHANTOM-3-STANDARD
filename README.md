@@ -2,7 +2,7 @@
 ## Used hackrf one to sniffer PHANTOM 3 STANDARD RC signal
 
 * **capture**抓包模块  
-只能指定一个载波频率抓包(默认设置针对大疆3标准版抓包)
+基于hackrf_transfer.c源码，只保留了必需的参数。只能指定一个载波频率抓包(默认设置针对大疆3标准版抓包)
 	>Usage:  
 	[-h help] # Display this text.  
 	[-f freq\_hz] # Frequency in Hz [0MHz to 7250MHz].  
