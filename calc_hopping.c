@@ -7,14 +7,13 @@
 #include <pthread.h>
 #include <time.h>
 
-#include "common.h"
+#include "rf_common.h"
 #include "bk5811_demodu.h"
 
 void sigint_callback_handler(int signum);
 int rx_callback(hackrf_transfer *transfer);
 
 // my
-int parse_opt(int argc, char* argv[], rf_param *rp);
 int scan_signal_channel(uint64_t freq_hz);
 
 /*
@@ -23,39 +22,21 @@ int scan_signal_channel(uint64_t freq_hz);
  *  total : mm = pp * 16  
  *
  */
-#define TIMES_PER_CHANNEL       1
+#define TIMES_PER_CHANNEL       2
 #define TOTAL_CHANNELS          16
 #define NUMBER_PER_PERIOD_ONE_CHANNEL       (112 * DEFAULT_SAMPLE_RATE_HZ * 2 / 1000 * TIMES_PER_CHANNEL)
 #define NUMBER_PER_PERIOD_ALL_CHANNELS      (NUMBER_PER_PERIOD_ONE_CHANNEL * TOTAL_CHANNELS)
-#define START_FREQ              5725000000
 
 // debug info
 #define IN_DEBUG     1   
 #define OUT_FUNCTION 1
 #define IN_FUNCTION  0
-
-#define RF_PARAM_INIT() { \
-        .freq_hz = DEFAULT_FREQ_HZ, \
-        .automatic_tuning = true, \
-        .amp_enable = 1, \
-        .amp = true, \
-        .sample_rate_hz = DEFAULT_SAMPLE_RATE_HZ, \
-        .sample_rate = true, \
-        .receive = true, \
-        .path = "data/1M_ALL_CHANNEL_ONE_PERIOD.iq", \
-        .samples_to_xfer = 0, \
-        .bytes_to_xfer = 0, \
-        .limit_num_samples = false, \
-        .lna_gain = 8, \
-        .vga_gain = 20, \
-        .baseband_filter_bw = true, \
-        .baseband_filter_bw_hz = 1000000 \
-}
+#define REAL_TIME_DATA 0
+#define LOCAL_DATA   1
 
 static hackrf_device* device = NULL;
 static bool do_exit = false;
 static int do_per_channel = 0;
-static rf_param rp = RF_PARAM_INIT();
 char *rx_buffer = NULL;
 static size_t rx_length = 0;
 int8_t channels[TOTAL_CHANNELS] = {13,18,23,28,33,38,43,48,53,58,63,68,73,78,83,88};
@@ -64,12 +45,23 @@ float cost_times[TOTAL_CHANNELS] = {0.0};
 int start, end;
 int cost = 0;
 int8_t g_ord[16] = {0};
+static packet_param pp = INIT_PP();
+static rf_param rp = RF_PARAM_INIT();
+decode_param *dp = NULL;
+s_packet *sp = NULL;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char *argv[])
 {
     int exit_code = EXIT_SUCCESS;
+
+    rp.path = "data/1M_ALL_CHANNEL_ONE_PERIOD.iq"; 
     
+    char* file_name = rp.path;
+    if (argc == 2)
+        file_name = argv[1];
+
+#if REAL_TIME_DATA    
     int result;
     int8_t i;
 #if OUT_FUNCTION && IN_DEBUG
@@ -131,28 +123,35 @@ int main(int argc, char *argv[])
     //
     //pthread_mutex_unlock(&mutex);
 
-    
     // write local file
     FILE *fd = NULL;
-    fd = fopen(rp.path, "wb");
+    fd = fopen(file_name, "wb");
     if(NULL != fd)
     {
         fwrite(rx_buffer, 1, rx_length, fd);
         fclose(fd);
     }
-    
-/*
-    // read local file.
-    long file_length = 0;
-    get_signal_data(rp.path, &rx_buffer, &file_length);
-    rx_length = file_length;
-*/
+    fprintf(stdout, "Write signal in \"%s\" file.\n ", file_name);
+#endif
 
-    float dlt = 0;
+#if LOCAL_DATA
+    // read local file.
+    long file_length = get_file_size(file_name);
+    long read_length = 0;
+    rx_buffer = (char *)malloc(file_length);
+    get_signal_data(file_name, rx_buffer, 0, &read_length);
+    rx_length = file_length;
+    fprintf(stdout, "Read signal from \"%s\" file.\n ", file_name);
+#endif
+
+    dp = (decode_param *)malloc(sizeof(decode_param));
+    sp = (s_packet *)malloc(sizeof(s_packet));
+
+    float times = 0;
     long first_position = 0;
     long last_position = 0;
     uint8_t l_channel = 0;
-    int dlt_time = 0;
+    int time_slot = 0;
     float threshold = 0.0;
     int split = TIMES_PER_CHANNEL;
     long begin = 0;
@@ -160,23 +159,24 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < TOTAL_CHANNELS * split; i++ )
     {
-        memset(g_inter, 0, sizeof(g_inter));
+        memset(dp, 0, sizeof(decode_param));
+        memset(sp, 0, sizeof(s_packet));
         begin = i * NUMBER_PER_PERIOD_ONE_CHANNEL / split;
-        threshold = mean(rx_buffer, begin, step); 
-        find_inter(rx_buffer, begin, step); 
+        threshold = mean(rx_buffer, begin, step, dp); 
+        find_inter(rx_buffer, begin, step, dp); 
 
-        if( 1 == work(rx_buffer, &last_position, &l_channel))
+        if( 1 == work(rx_buffer, dp, &pp, sp))
         {
             //  first signal position
             if(first_position == 0)
             {
                 first_position = last_position;
             }
-            dlt = (last_position - first_position) * 1000.0 / (DEFAULT_SAMPLE_RATE_HZ * 2 * 7) + 0.5;
-            dlt_time = (int)(dlt) % TOTAL_CHANNELS;
+            times = (last_position - first_position) * 1000.0 / (DEFAULT_SAMPLE_RATE_HZ * 2 * 7) + 0.5;
+            time_slot = (int)(times) % TOTAL_CHANNELS;
             float a = last_position * 1000.0 / (DEFAULT_SAMPLE_RATE_HZ * 2 * 7) + 0.5;
-            printf("channel : %d\tg_threshold : %f\tdlt_time : %f<-->%d\ttime : %f<-->%d\n", channels[i/split], threshold, dlt, dlt_time, a, (int)(a)%16); 
-            g_ord[dlt_time] = channels[i/split];
+            printf("channel : %d<-->%d\tg_threshold : %f\ttime_slot : %f<-->%d\ttime : %f<-->%d\n", channels[i/split], l_channel, threshold, times, time_slot, a, (int)(a)%16); 
+            g_ord[time_slot] = channels[i/split];
         }
     }
 
@@ -186,6 +186,8 @@ int main(int argc, char *argv[])
     fprintf(stdout, "\n");
 
     free(rx_buffer);
+    free(dp);
+    free(sp);
     rx_buffer = NULL;
     hackrf_exit();
 
@@ -224,7 +226,6 @@ int scan_signal_channel(uint64_t freq_hz)
 
     result = hackrf_stop_rx(device); 
     result = hackrf_close(device);
-
     return 0;
 }
 

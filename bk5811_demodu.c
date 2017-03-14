@@ -9,22 +9,11 @@
 #include "bk5811_demodu.h"
 
 
-// threshold
-float g_threshold = 0.0;
-#define DEFAULT_THRESHOLD   (10.0)
-
-// inter_array : less than 1000
-// odd:start
-// eve:end
-long g_inter[PACKET_COUNT] = {0};
-
-int g_pkg_count = 0;
-
-// read signal from file
-// buffer : malloc in this function, and should be freed by release() function
-int get_signal_data(char *filename, char **buffer, long *file_length)
+// get file size
+long get_file_size(char* filename)
 {
     FILE *fp = NULL;
+    long file_length = -1;
     
     fp = fopen(filename,"r");
     
@@ -36,19 +25,33 @@ int get_signal_data(char *filename, char **buffer, long *file_length)
     }
     
     fseek(fp,0,SEEK_END);   // 2
-    *file_length = ftell(fp);
+    file_length = ftell(fp);
     fseek(fp,0,SEEK_SET);   // 0
+
+    fclose(fp);
     
-    *buffer = (char *)malloc(*file_length);
-   
-    if(NULL == *buffer)
+    return file_length;
+}
+
+// read signal from file
+// buffer : malloc in this function, and should be freed by release() function
+int get_signal_data( IN char *filename, IN char *buffer, IN long read_offset, IN OUT long *read_length)
+{
+    FILE *fp = NULL;
+    
+    fp = fopen(filename,"r");
+    
+    if(NULL == fp)
     {
-        printf("malloc mem failed.\n");
+        printf("open file failed.\n");
+        //printf ("error: %s\n",strerror(errno));
         return BK_FAILED;
     }
+
+    fseek(fp, read_offset, SEEK_SET);
     
     // file should be less than 2^32
-    fread(*buffer, sizeof(char), *file_length, fp);
+    *read_length = fread(buffer, sizeof(char), *read_length, fp);
     //printf ("error: %s\n",strerror(errno));
     
     fclose(fp);
@@ -57,7 +60,7 @@ int get_signal_data(char *filename, char **buffer, long *file_length)
 }
 
 // free the buffer
-void release(char *buffer)
+void release(IN char *buffer)
 {
     if(NULL != buffer)
     {
@@ -67,7 +70,7 @@ void release(char *buffer)
 }
 
 // find the threshold
-float mean(char *buffer, long start, long length)
+float mean(IN char *buffer, IN long start, IN long length, decode_param *dp)
 {
     unsigned long sum = 0;
     
@@ -76,23 +79,24 @@ float mean(char *buffer, long start, long length)
     for(long i = start; i < end; i += 2)
     {
         sum += abs((int8_t)buffer[i]);
+        // 溢出
         if(BK_OVERFLOW < sum)
         {
             printf("error : the sum is overflow!\n");
             return BK_FAILED;
         }
     }
-    float temp = (sum * 2.0 * DLT / length);
-    //g_threshold = temp > DEFAULT_THRESHOLD ? temp : DEFAULT_THRESHOLD;
-    g_threshold = temp;
+    // 放大10倍
+    float temp = (sum * 2.0 * 10 / length);
+    //dp->threshold = temp > DEFAULT_THRESHOLD ? temp : DEFAULT_THRESHOLD;
+    dp->threshold = temp;
 
     return temp;
-//    return BK_SUCCESS;
 }
 
 
 // find the signal
-int find_inter(char *buffer, long start, long length)
+int find_inter(IN char *buffer, IN long start, IN long length, OUT decode_param *dp)
 {
     long index = 0;
     int is_find = 0;
@@ -109,21 +113,25 @@ int find_inter(char *buffer, long start, long length)
         float mean_temp = sum_temp / sample_count;
         
         // find the signal start position
-        if(mean_temp > g_threshold && 0 == is_find)
+        if(mean_temp > dp->threshold && 0 == is_find)
         {
-            g_inter[index++] = i;
+            dp->inter[index++] = i;
             is_find = 1;
         }
         // find the signal end position
-        else if(mean_temp < g_threshold && 1 == is_find)
+        else if(mean_temp < dp->threshold && 1 == is_find)
         {
-            g_inter[index++] = i + sample_count * 2;
+            dp->inter[index++] = i + sample_count * 2;
             is_find = 2;
+            dp->total += 2;
         }
         if(2 == is_find)
         {
-            if((g_inter[index-1] - g_inter[index-2]) < SIGNAL_MAX_BITS)
+            if((dp->inter[index-1] - dp->inter[index-2]) < SIGNAL_MAX_BITS)
+            {
                 index -=2;
+                dp->total -= 2;
+            }
             is_find = 0;
         }
     }
@@ -131,8 +139,10 @@ int find_inter(char *buffer, long start, long length)
 }
 
 // demodulate the signal
-// 使用有符号数没有问题。有些信号crc校验不过，可能是因为接收器的误差，导致有符号位翻转等原因。
-int8_t demod_bits(char *buffer, long ss, int demod_length, int sample_per_symbol)
+/* 
+ * 使用有符号数没有问题。有些信号crc校验不过，可能是因为接收器的误差，导致有符号位翻转等原因。具体原因还要在看看??????
+*/
+int8_t demod_bits(IN char *buffer, IN long ss, IN int demod_length, IN int sample_per_symbol)
 {
     int8_t result = 0;
     int8_t I0, Q0, I1, Q1;
@@ -155,36 +165,36 @@ int8_t demod_bits(char *buffer, long ss, int demod_length, int sample_per_symbol
 }
 
 // search the preamble
-long search_preamble(char *buffer, long ss, long sig_len, int match_length, int sample_per_symbol)
+long search_preamble(IN char *buffer, IN long ss, IN long sig_len, IN int match_length, IN int preamble_bytes, IN uint64_t dest_preamble, IN int sample_per_symbol)
 {
-    uint8_t result = 0;
+    uint64_t result = 0;
     long sig_new_start = -1;
-    uint8_t bit = 0;
-    for(int i = 0; i < (sig_len - SIGNAL_MAX_BITS); i += 2)
+    int8_t preamble_len = 0;
+    int j;
+    
+    //for(int i = 0; i < (sig_len - SIGNAL_MAX_BITS); i += 2)
+    for(int i = 0; i < sig_len; i += 2)
     {
-        // find 10101010b ＝ 0x0AA or 01010101b = 0x55
-        result = demod_bits(buffer, ss + i, match_length, sample_per_symbol);
-        bit = demod_bits(buffer, ss + i + match_length * sample_per_symbol * 2, 8, sample_per_symbol);
-        bit >>= 7;
-        bit &= 1;
-        if((result == 0xAA) && (1 == bit))     // should be change by user
+        j = i;
+        result = 0;
+        preamble_len = preamble_bytes;
+        while(preamble_len--)
+        {
+            result <<= 8;
+            result |= (uint8_t)demod_bits(buffer, ss + j, match_length, sample_per_symbol);
+            j += (2 * 8 * sample_per_symbol);
+        }
+        if(result == dest_preamble) 
         {
             sig_new_start = i;
             break;
         }
-        /*
-        else if((result == 0x55) && (0 == bit))
-        {
-            sig_new_start = i;
-            break;
-        }
-        */
     }
     return sig_new_start;
 }
 
 // value to bytes array
-void packet_pack(int64_t address, uint16_t pcf, uint8_t *payload, int payload_len, uint8_t *packet)
+void packet_pack(IN int64_t address, IN uint16_t pcf, IN uint8_t *payload, IN int payload_len, OUT uint8_t *packet)
 {
     int c;
     uint64_t packet_header = address;
@@ -197,7 +207,7 @@ void packet_pack(int64_t address, uint16_t pcf, uint8_t *payload, int payload_le
 }
 
 // check the crc, if the crc not match, disable the signal
-uint32_t calc_crc(const uint8_t *data, size_t data_len)
+uint32_t calc_crc(IN const uint8_t *data, IN size_t data_len)
 {
     uint8_t i;
     bool bit;
@@ -221,122 +231,135 @@ uint32_t calc_crc(const uint8_t *data, size_t data_len)
 }
 
 // work function
-int work(char *buffer, long *start_position, uint8_t *channel)
+// if crc is valid, return 1
+// if crc is unvalid , return 2
+// if not find signal, return 0
+int work(IN char *buffer, IN decode_param *dp, IN packet_param *lpp, OUT s_packet *sp) 
 {
-    int i = 0;
     int isfind = 0;
     
-    // test 
-    int count = 0;
-    while(0 != g_inter[i])
+    long signal_start = dp->inter[dp->current];
+    long signal_end = dp->inter[dp->current + 1];
+    long signal_new_start = 0;
+
+    uint64_t preamble = 0;
+    int64_t address = 0;
+    uint16_t pcf = 0;
+    int payload_len = 0;
+    uint8_t packet_buffer[32] = {0};
+    uint16_t crc = 0;
+    uint8_t packet[45] = {0};
+    uint16_t new_crc = 0;
+
+    long tmp_start = 0;
+    int sample_per_symbol = lpp->sampler_per_symbol;
+
+    //find the preamble code
+    signal_new_start = search_preamble(buffer, signal_start, signal_end - signal_start, 8, lpp->preamble_len, lpp->dest_preamble, sample_per_symbol);
+    if(-1 != signal_new_start)
     {
-        long signal_start = g_inter[i];
-        long signal_end = g_inter[i + 1];
-        long signal_new_start = 0;
-        uint8_t preamble = 0;
-        int64_t address = 0;
-        uint16_t pcf = 0;
-        int payload_len = 0;
-        uint8_t packet_buffer[32] = {0};
-        uint16_t crc = 0;
-        uint8_t packet[45] = {0};
-        uint16_t new_crc = 0;
-        long tmp_start = 0;
+        // decode preamble
+        signal_start += signal_new_start;
+        tmp_start = signal_start;
 
-        // a signal must be more than 400bit
-        if((signal_end - signal_start) > SIGNAL_MAX_BITS)
+        int preamble_len = lpp->preamble_len;
+        while(preamble_len--)
         {
-            //find the preamble code
-            signal_new_start = search_preamble(buffer, signal_start, signal_end - signal_start, 8, SAMPLE_PER_SYMBOL);
-            if(-1 != signal_new_start)
-            {
-                // decode preamble
-                signal_start += signal_new_start;
-                tmp_start = signal_start;
-
-                preamble = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
-                
-                // decode address
-                for (int j = 0; j < 5; j++) {
-                    signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                    address <<= 8;
-                    address |= (demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL) & 0xff);
-                }
-                
-                // decode pcf
-                signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                pcf |= (uint8_t)demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
-                pcf <<= 1;
-                signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                uint8_t temp = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
-                temp >>= 7;
-                pcf |= temp;
-                
-                // paylaod length must be less than 32
-                payload_len = (pcf&0x1f8)>>3;
-                
-                if(payload_len <= 0x20)
-                {
-                    // decode payload
-                    signal_start += (1 * SAMPLE_PER_SYMBOL * 2);
-                    for (int j = 0; j < payload_len; j++) {
-                        packet_buffer[j] = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
-                        signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                    }
-                
-                    // decode crc
-                    //signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                    crc = demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL);
-                    signal_start += (8 * SAMPLE_PER_SYMBOL * 2);
-                    crc <<= 8;
-                    crc |= (demod_bits(buffer, signal_start, 8, SAMPLE_PER_SYMBOL)&0xff);
-                    
-                    packet_pack(address, pcf, packet_buffer, payload_len, packet);
-                    new_crc = calc_crc(packet, payload_len + 7);
-                
-                    //
-                    if(crc == new_crc)
-                    {
-                        *start_position = tmp_start;
-                        *channel = 255 - ((address>>32)&0xff);
-                        count++;
-                        //printf("find %d signal.\n", count);
-                        g_pkg_count++;
-                        // print the values
-                        printf("channel : %d,\tpk_count : %d,\tpreamble : %X,\taddress : %05llX,\tpayload length : %d,\tpid : %d,\tno_ack : %d,\t", *channel, g_pkg_count, preamble, address, (pcf&0x1f8)>>3, (pcf&0x6)>>1,pcf&1);
-                        printf("payload : ");
-                        for(int j = 0; j < payload_len; j++)
-                            printf("%02X", packet_buffer[j]);
-                        printf(",\tcrc : %04X\n", crc);
-                        // find signal
-                        isfind = 1;
-                    }
-#if 0
-                    else
-                    {
-                        FILE *fd = NULL;
-                        char filename[255] = {0};
-                        sprintf(filename, "data/could_not_demodule_%ld.iq", tmp_start);
-                        fd = fopen(filename, "wb");
-                        int file_dlt = 1000;
-                        long len = g_inter[i+1] - g_inter[i] + file_dlt * 2;
-                        fwrite(&buffer[g_inter[i]] - file_dlt, 1, len, fd);
-                        fclose(fd);
-                    }
-#endif
-                }
-            }
+            preamble <<= 8;
+            preamble |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
+            signal_start += (8 * sample_per_symbol * 2);
         }
-        signal_new_start = -1;
-        i += 2;
+        
+        // decode address
+        for (uint8_t j = 0; j < lpp->address_len; j++) {
+            address <<= 8;
+            address |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
+            signal_start += (8 * sample_per_symbol * 2);
+        }
+        
+        // decode pcf
+        if(lpp->is_use_pcf == 1)
+        {
+            pcf |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
+            signal_start += (8 * sample_per_symbol * 2);
+            pcf <<= 1;
+            uint8_t temp = (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
+            temp >>= 7;
+            pcf |= temp;
+            
+            // paylaod length must be less than 32
+            payload_len = (pcf&0x1f8)>>3;
+        }
+        if(payload_len <= 0x20)
+        {
+            isfind = 2;
+            // decode payload
+            signal_start += (1 * sample_per_symbol * 2);
+            for (int j = 0; j < payload_len; j++) {
+                packet_buffer[j] = (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
+                signal_start += (8 * sample_per_symbol * 2);
+            }
+        
+            // decode crc
+            uint8_t crc_len = lpp->crc_len;
+            while(crc_len--)
+            {
+                crc <<= 8;
+                crc |= (demod_bits(buffer, signal_start, 8, sample_per_symbol) & 0xff);
+                signal_start += (8 * sample_per_symbol * 2);
+            }
+            packet_pack(address, pcf, packet_buffer, payload_len, packet);
+            new_crc = calc_crc(packet, payload_len + 7);
+        
+            //
+            if(crc == new_crc)
+            {
+                sp->start_position = tmp_start;
+                sp->channel = 255 - ((address>>32)&0xff);
+                sp->preamble = preamble;
+                sp->address = address;
+                sp->payload_len = (pcf&0x1f8)>>3;
+                sp->pid = (pcf&0x6)>>1;
+                sp->no_ack = pcf&1;
+                sp->crc = crc;
+
+                for(int j = 0; j < payload_len; j++)
+                {
+                    sp->packet_buffer[j] = packet_buffer[j];
+                }
+                // find valid signal
+                isfind = 1;
+            }
+#if 0
+            else
+            {
+                FILE *fd = NULL;
+                char filename[255] = {0};
+                sprintf(filename, "data/could_not_demodule_%ld.iq", tmp_start);
+                fd = fopen(filename, "wb");
+                int file_dlt = 1000;
+                long len = dp->inter[i+1] - dp->inter[i] + file_dlt * 2;
+                fwrite(&buffer[dp->inter[i]] - file_dlt, 1, len, fd);
+                fclose(fd);
+            }
+#endif
+        }
     }
 
     return isfind;
 }
 
-// debug the could not demodule signal.
-void set_inter(long end)
+float calc_diff_time(long start_p, long end_p, uint64_t sample_rate)
 {
-    g_inter[0] = 2;
-    g_inter[1] = end;
+    float diff_time = (end_p - start_p) * 1000.0 / (sample_rate * 2);
+
+    return diff_time;
+}
+/*
+ * debug function
+ *
+*/
+// debug the could not demodule signal.
+void set_inter(long end )
+{
 }
