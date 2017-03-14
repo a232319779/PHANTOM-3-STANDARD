@@ -46,7 +46,7 @@ Default set : -i 1 -j 0xAA -m 5 -e 1 -p 2 -c 2 -t 16 -y 7 -s 1000000 -r data/1M\
 	参数解释:  
 	preamble长度1字节,preamble是0xAA,MAC地址长度5字节,使用esb模式,pcf长度2字节,crc长度2字节,包含16个时隙(计算周期),每个时隙长度7ms，信号文件'data/1M\_5738\_recive\_1s.iq',采样率1MHz
 	
-	`$ ./decode -i 1 -j 0xAA -n 5 -e 1 -p 2 -c 2 -t 16 -y 7 -r data/1M_5738_recive_1s.iq -s 1000000`
+	`$ ./decode -i 1 -j 0xAA -m 5 -e 1 -p 2 -c 2 -t 16 -y 7 -s 1000000 -r data/1M_5738_recive_1s.iq`
     
 	或者直接运行
     
