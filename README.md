@@ -24,7 +24,7 @@ Default set : -f 5738000000 -a 1 -l 32 -g 20 -s 1000000 -n 1000000 -r data/1M\_5
 	`$ ./capture`	
 	
 	执行结果如图所示:  
-	![capture]()
+	![capture](https://github.com/a232319779/PHANTOM-3-STANDARD/blob/master/screenshot/capture.png)
 
 * **decode**解码模块  
 对离线数据包进行解调和解析。参数包括preamble长度和值,MAC地址长度,是否是ESB模式,PCF长度,CRC长度,时隙个数,时隙时长,需要解码对数据文件,数据文件的采样率。(默认设置针对大疆3标准版解码)。
@@ -53,7 +53,7 @@ Default set : -i 1 -j 0xAA -m 5 -e 1 -p 2 -c 2 -t 16 -y 7 -s 1000000 -r data/1M\
 	`$ ./decode`
 	
 	执行结果如图所示:  
-	![decode]()
+	![decode](https://github.com/a232319779/PHANTOM-3-STANDARD/blob/master/screenshot/decode.png)
 	
 * **scan_phantom**扫描模块  
 实时扫描指定载波频率开始的n个信道,每个信道带宽1M.扫描完成之后计算出'时隙'大小，'突发'大小.
@@ -85,7 +85,7 @@ Default set : -i 1 -j 0xAA -m 5 -e 1 -p 2 -c 2 -q 127 -S 1 -f 5725000000 -a 1 -l
 	`$ ./scan_phantom`
 
 	执行结果如图所示:  
-	![scan_phantom]()
+	![scan_phantom](https://github.com/a232319779/PHANTOM-3-STANDARD/blob/master/screenshot/scan_phantom.png)
 
 * **calc_hopping**计算跳频图案模块
 	* 开发中  
